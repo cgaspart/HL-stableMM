@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  market-maker:
+    build: .
+    container_name: hyperliquid-market-maker
+    ports:
+      - "5000:5000"  # Flask API and frontend
+    volumes:
+      - ./data:/app/data  # Persist database
+    environment:
+      - WALLET_ADDRESS=${WALLET_ADDRESS}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - DB_PATH=/app/data/market_maker.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
