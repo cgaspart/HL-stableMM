@@ -11,7 +11,11 @@ const state = {
 document.addEventListener('DOMContentLoaded', () => {
     initNavigation();
     initCharts();
-    fetchAllData();
+    
+    // Delay initial fetch to ensure charts are ready
+    setTimeout(() => {
+        fetchAllData();
+    }, 100);
     
     // Update every 5 seconds
     state.updateInterval = setInterval(fetchAllData, 5000);
@@ -181,7 +185,7 @@ async function fetchUnrealizedPnl() {
 }
 
 async function fetchPerformanceMetrics() {
-    const response = await fetch('/api/performance/metrics');
+    const response = await fetch('/api/performance/stats');
     const data = await response.json();
     
     // Performance page
@@ -516,6 +520,10 @@ function initCharts() {
                 label: 'P&L',
                 data: [],
                 backgroundColor: (context) => {
+                    // Handle undefined data during initialization
+                    if (!context.parsed || context.parsed.y === undefined) {
+                        return 'rgba(16, 185, 129, 0.6)';
+                    }
                     const value = context.parsed.y;
                     return value >= 0 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(239, 68, 68, 0.6)';
                 },

@@ -467,9 +467,9 @@ def get_unrealized_pnl():
         'current_price': current_price
     })
 
-@app.route('/api/performance/metrics')
-def get_performance_metrics():
-    """Calculate advanced performance metrics"""
+@app.route('/api/performance/stats')
+def get_performance_stats():
+    """Calculate advanced performance statistics"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
