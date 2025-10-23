@@ -280,17 +280,37 @@ def calculate_order_sizes():
 def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
     """Calculate bid and ask prices - stablecoin MM strategy"""
     
-    # Check minimum spread requirement
-    if spread_bps < MIN_SPREAD_BPS:
-        log(f"⏸️ Spread too tight: {spread_bps:.2f} bps < {MIN_SPREAD_BPS} bps minimum")
-        return None, None
-    
     # Calculate inventory ratio for skewing
     inventory_ratio = (position - TARGET_INVENTORY) / MAX_POSITION if MAX_POSITION > 0 else 0
     
     # Initialize prices
     bid_price = highest_bid
     ask_price = lowest_ask
+    
+    # Check if we can do inventory management actions (bypass spread check)
+    can_average_down = False
+    can_sell_profit = False
+    
+    if position > 0 and average_buy_price > 0:
+        # Check if we can average down
+        buy_price_with_fee = highest_bid * (1 + MAKER_FEE)
+        can_average_down = buy_price_with_fee < average_buy_price
+        
+        # Check if we can sell at profit
+        breakeven_price = average_buy_price / (1 - MAKER_FEE)
+        can_sell_profit = lowest_ask >= breakeven_price
+    
+    # Only enforce MIN_SPREAD_BPS if we're NOT doing inventory management
+    if spread_bps < MIN_SPREAD_BPS:
+        if can_average_down or can_sell_profit:
+            log(f"⚡ Spread tight ({spread_bps:.2f} bps) but inventory management available:")
+            if can_average_down:
+                log(f"   ✅ Can average down: {highest_bid:.5f} < avg {average_buy_price:.5f}")
+            if can_sell_profit:
+                log(f"   ✅ Can sell at profit: {lowest_ask:.5f} >= breakeven {breakeven_price:.5f}")
+        else:
+            log(f"⏸️ Spread too tight: {spread_bps:.2f} bps < {MIN_SPREAD_BPS} bps minimum (no inventory actions available)")
+            return None, None
     
     # Aggressive inventory management for stablecoins
     if abs(inventory_ratio) > INVENTORY_SKEW_THRESHOLD:
