@@ -253,66 +253,6 @@ def get_position_history():
     conn.close()
     return jsonify(history)
 
-@app.route('/api/positions/open')
-def get_open_positions():
-    """Get current open positions (FIFO queue)"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Get open positions ordered by timestamp (FIFO)
-    cursor.execute('''
-        SELECT 
-            id,
-            trade_id,
-            timestamp,
-            amount,
-            price_with_fee,
-            remaining_amount
-        FROM open_positions
-        WHERE remaining_amount > 0
-        ORDER BY timestamp ASC
-    ''')
-    
-    positions = []
-    total_amount = 0
-    total_cost = 0
-    
-    for row in cursor.fetchall():
-        remaining = row['remaining_amount']
-        price = row['price_with_fee']
-        
-        # Calculate minimum profitable sell price (need to cover sell fee)
-        min_profitable_price = price * (1 + MAKER_FEE)
-        
-        positions.append({
-            'id': row['id'],
-            'trade_id': row['trade_id'],
-            'timestamp': row['timestamp'],
-            'original_amount': row['amount'],
-            'remaining_amount': remaining,
-            'price_with_fee': price,
-            'min_profitable_price': min_profitable_price,
-            'cost_basis': remaining * price
-        })
-        
-        total_amount += remaining
-        total_cost += remaining * price
-    
-    # Calculate average
-    average_price = total_cost / total_amount if total_amount > 0 else 0
-    
-    conn.close()
-    
-    return jsonify({
-        'positions': positions,
-        'summary': {
-            'total_positions': len(positions),
-            'total_amount': round(total_amount, 2),
-            'average_price': round(average_price, 5),
-            'total_cost_basis': round(total_cost, 2)
-        }
-    })
-
 @app.route('/api/market/current')
 def get_current_market():
     """Get current market state with live orderbook data"""

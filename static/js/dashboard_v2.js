@@ -94,7 +94,7 @@ async function fetchAllData() {
             fetchPnlBreakdown(),
             fetchSystemHealth(),
             fetchRecentTrades(),
-            fetchOpenPositions(),
+            fetchCurrentPosition(),
             fetchTradeHistory(),
             fetchPositionHistory(),
             fetchSpreadHistory()
@@ -274,38 +274,39 @@ async function fetchRecentTrades() {
     }).join('');
 }
 
-async function fetchOpenPositions() {
-    const response = await fetch('/api/positions/open');
-    const data = await response.json();
+async function fetchCurrentPosition() {
+    // Fetch current stats and market data
+    const [statsResponse, marketResponse, unrealizedResponse] = await Promise.all([
+        fetch('/api/stats'),
+        fetch('/api/market/current'),
+        fetch('/api/performance/unrealized_pnl')
+    ]);
     
-    document.getElementById('totalPositions').textContent = data.summary.total_positions;
-    document.getElementById('totalAmount').textContent = `${data.summary.total_amount.toFixed(2)} USDHL`;
+    const stats = await statsResponse.json();
+    const market = await marketResponse.json();
+    const unrealized = await unrealizedResponse.json();
     
-    const tbody = document.getElementById('openPositionsTable');
+    const MAKER_FEE = 0.0004;
+    const position = stats.current_position;
+    const avgPrice = stats.average_buy_price;
+    const midPrice = market.mid_price;
     
-    if (data.positions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="loading">No open positions</td></tr>';
-        return;
-    }
+    // Update position display
+    document.getElementById('currentPositionAmount').textContent = `${position.toFixed(2)} USDHL`;
+    document.getElementById('currentAvgPrice').textContent = `$${avgPrice.toFixed(5)}`;
     
-    tbody.innerHTML = data.positions.map((pos, index) => {
-        const date = new Date(pos.timestamp);
-        const isPartial = pos.remaining_amount < pos.original_amount;
-        const statusBadge = isPartial 
-            ? `<span style="color: var(--warning);">Partial</span>`
-            : `<span style="color: var(--success);">Open</span>`;
-        
-        return `
-            <tr>
-                <td>#${index + 1} ${index === 0 ? '<span style="color: var(--accent-primary); font-weight: 600;">NEXT</span>' : ''}</td>
-                <td>${date.toLocaleString()}</td>
-                <td>${pos.remaining_amount.toFixed(2)} USDHL</td>
-                <td>$${pos.price_with_fee.toFixed(5)}<br><small style="color: var(--text-muted);">Total: $${pos.cost_basis.toFixed(2)}</small></td>
-                <td style="color: var(--success); font-weight: 600;">$${pos.min_profitable_price.toFixed(5)}</td>
-                <td>${statusBadge}</td>
-            </tr>
-        `;
-    }).join('');
+    // Calculate and display metrics
+    const costBasis = position * avgPrice;
+    const breakevenPrice = avgPrice / (1 - MAKER_FEE);
+    
+    document.getElementById('totalCostBasis').textContent = `$${costBasis.toFixed(2)}`;
+    document.getElementById('breakevenPrice').textContent = `$${breakevenPrice.toFixed(5)}`;
+    document.getElementById('currentMarketPrice').textContent = `$${midPrice.toFixed(5)}`;
+    document.getElementById('positionUnrealizedPnl').textContent = `$${unrealized.unrealized_pnl.toFixed(2)}`;
+    
+    const pctElement = document.getElementById('positionUnrealizedPct');
+    pctElement.textContent = `${unrealized.unrealized_pnl_pct >= 0 ? '+' : ''}${unrealized.unrealized_pnl_pct.toFixed(2)}%`;
+    pctElement.className = 'detail-change ' + (unrealized.unrealized_pnl >= 0 ? 'positive' : 'negative');
 }
 
 async function fetchTradeHistory() {

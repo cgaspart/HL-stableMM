@@ -299,31 +299,34 @@
                     </div>
                 </div>
 
-                <!-- Open Positions Table -->
+                <!-- Current Position Card -->
                 <div class="table-card">
                     <div class="table-header">
-                        <h3>Open Positions (FIFO Queue)</h3>
+                        <h3>Current Position</h3>
                         <div class="table-stats">
-                            <span class="stat-badge">Total: <strong id="totalPositions">0</strong></span>
-                            <span class="stat-badge">Amount: <strong id="totalAmount">0 USDHL</strong></span>
+                            <span class="stat-badge">Position: <strong id="currentPositionAmount">0 USDHL</strong></span>
+                            <span class="stat-badge">Avg Price: <strong id="currentAvgPrice">$0.00000</strong></span>
                         </div>
                     </div>
-                    <div class="table-container">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Order</th>
-                                    <th>Time</th>
-                                    <th>Amount</th>
-                                    <th>Cost Basis</th>
-                                    <th>Min Profitable</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="openPositionsTable">
-                                <tr><td colspan="6" class="loading">Loading positions...</td></tr>
-                            </tbody>
-                        </table>
+                    <div class="position-details-grid">
+                        <div class="position-detail-card">
+                            <div class="detail-label">Total Cost Basis</div>
+                            <div class="detail-value" id="totalCostBasis">$0.00</div>
+                        </div>
+                        <div class="position-detail-card">
+                            <div class="detail-label">Breakeven Price</div>
+                            <div class="detail-value" id="breakevenPrice">$0.00000</div>
+                            <div class="detail-subtext">Price needed to cover fees</div>
+                        </div>
+                        <div class="position-detail-card">
+                            <div class="detail-label">Current Market Price</div>
+                            <div class="detail-value" id="currentMarketPrice">$0.00000</div>
+                        </div>
+                        <div class="position-detail-card">
+                            <div class="detail-label">Unrealized P&L</div>
+                            <div class="detail-value" id="positionUnrealizedPnl">$0.00</div>
+                            <div class="detail-change" id="positionUnrealizedPct">0.00%</div>
+                        </div>
                     </div>
                 </div>
             </div>

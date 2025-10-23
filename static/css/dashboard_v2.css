@@ -803,6 +803,54 @@ body {
     background: var(--danger);
 }
 
+/* Position Details Grid */
+.position-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    padding: 20px;
+}
+
+.position-detail-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.detail-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.detail-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.detail-subtext {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.detail-change {
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.detail-change.positive {
+    color: var(--success);
+}
+
+.detail-change.negative {
+    color: var(--danger);
+}
+
 /* Loading */
 .loading {
     text-align: center;
