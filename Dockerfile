@@ -19,7 +19,7 @@ COPY . .
 RUN mkdir -p /app/data
 
 # Expose Flask API port
-EXPOSE 5000
+EXPOSE 80
 
 # Make startup script executable
 RUN chmod +x /app/start.sh

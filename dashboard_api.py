@@ -308,4 +308,7 @@ def get_open_positions():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Bind to 0.0.0.0 to be accessible from outside container
+    # Use port 80 for Traefik compatibility
+    port = int(os.getenv('FLASK_PORT', '80'))
+    app.run(host='0.0.0.0', port=port, debug=False)
