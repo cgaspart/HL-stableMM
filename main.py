@@ -80,6 +80,60 @@ def init_database():
         )
     ''')
     
+    # Create market snapshots table for spread and volatility tracking
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS market_snapshots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER,
+            mid_price REAL,
+            best_bid REAL,
+            best_ask REAL,
+            spread_bps REAL,
+            bid_depth_5 REAL,
+            ask_depth_5 REAL
+        )
+    ''')
+    
+    # Create order events table for order lifecycle tracking
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS order_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER,
+            order_id TEXT,
+            event_type TEXT,
+            side TEXT,
+            price REAL,
+            amount REAL,
+            reason TEXT
+        )
+    ''')
+    
+    # Create daily metrics table for performance tracking
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS daily_metrics (
+            date TEXT PRIMARY KEY,
+            total_trades INTEGER,
+            total_volume REAL,
+            realized_profit REAL,
+            fees_paid REAL,
+            avg_spread_bps REAL,
+            max_position REAL,
+            min_position REAL
+        )
+    ''')
+    
+    # Create system events table for health monitoring
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS system_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER,
+            event_type TEXT,
+            severity TEXT,
+            message TEXT,
+            details TEXT
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -158,6 +212,45 @@ def save_position_snapshot(usdc_balance):
         INSERT OR REPLACE INTO position_snapshots (timestamp, position, average_buy_price, usdc_balance)
         VALUES (?, ?, ?, ?)
     ''', (int(time.time()), position, average_buy_price, usdc_balance))
+    
+    conn.commit()
+    conn.close()
+
+def save_market_snapshot(mid_price, best_bid, best_ask, spread_bps, bid_depth, ask_depth):
+    """Save market snapshot for spread and volatility tracking"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO market_snapshots (timestamp, mid_price, best_bid, best_ask, spread_bps, bid_depth_5, ask_depth_5)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (int(time.time() * 1000), mid_price, best_bid, best_ask, spread_bps, bid_depth, ask_depth))
+    
+    conn.commit()
+    conn.close()
+
+def log_order_event(order_id, event_type, side, price, amount, reason=""):
+    """Log order lifecycle events"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO order_events (timestamp, order_id, event_type, side, price, amount, reason)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (int(time.time() * 1000), order_id, event_type, side, price, amount, reason))
+    
+    conn.commit()
+    conn.close()
+
+def log_system_event(event_type, severity, message, details=""):
+    """Log system events for health monitoring"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO system_events (timestamp, event_type, severity, message, details)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (int(time.time() * 1000), event_type, severity, message, details))
     
     conn.commit()
     conn.close()
@@ -557,6 +650,13 @@ try:
             mid_price = (lowest_ask + highest_bid) / 2
             spread_pct = ((lowest_ask - highest_bid) / mid_price) * 100
             spread_bps = spread_pct * 100  # Convert to basis points
+            
+            # Calculate orderbook depth (top 5 levels)
+            bid_depth = sum([level[1] for level in orderbook['bids'][:5]]) if len(orderbook['bids']) >= 5 else 0
+            ask_depth = sum([level[1] for level in orderbook['asks'][:5]]) if len(orderbook['asks']) >= 5 else 0
+            
+            # Save market snapshot for analytics
+            save_market_snapshot(mid_price, highest_bid, lowest_ask, spread_bps, bid_depth, ask_depth)
             
             # Check if we need to requote
             need_requote, reason = should_requote(highest_bid, lowest_ask, position)
