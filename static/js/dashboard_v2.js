@@ -100,9 +100,7 @@ async function fetchAllData() {
             fetchPositionHistory(),
             fetchSpreadHistory(),
             fetchUnrealizedPnlHistory(),
-            fetchBotState(),
-            fetchOrderEvents(),
-            fetchRecentActivity()
+            fetchBotLogs()
         ]);
         updateConnectionStatus(true);
     } catch (error) {
@@ -442,174 +440,95 @@ async function fetchUnrealizedPnlHistory() {
     }
 }
 
-async function fetchBotState() {
-    const response = await fetch('/api/bot/state');
-    const data = await response.json();
-    
-    // Update state values
-    document.getElementById('statPosition').textContent = `${data.position.toFixed(2)} USDHL`;
-    document.getElementById('statInventoryRatio').textContent = `${data.inventory_ratio}% of max`;
-    document.getElementById('statAvgPrice').textContent = `$${data.average_buy_price.toFixed(5)}`;
-    document.getElementById('statBreakeven').textContent = `$${data.breakeven_price.toFixed(5)}`;
-    document.getElementById('statMidPrice').textContent = `$${data.mid_price.toFixed(5)}`;
-    document.getElementById('statSpread').textContent = `${data.spread_bps.toFixed(1)} bps`;
-    document.getElementById('statUsdcBalance').textContent = `$${data.usdc_balance.toFixed(2)}`;
-    
-    // Update progress bar
-    const progressBar = document.getElementById('positionProgress');
-    progressBar.style.width = `${Math.min(data.inventory_ratio, 100)}%`;
-    
-    // Update decision logic based on main.py logic
-    updateDecisionLogic(data);
-}
+// Terminal state
+let autoScroll = true;
+let lastLogTimestamp = 0;
 
-function updateDecisionLogic(data) {
-    const MIN_SPREAD_BPS = 3;
-    const INVENTORY_SKEW_THRESHOLD = 60; // 60%
-    const AVERAGE_DOWN_THRESHOLD_BPS = 20;
-    
-    // 1. Spread Check
-    const spreadCheck = document.getElementById('checkSpread');
-    if (data.spread_bps >= MIN_SPREAD_BPS) {
-        updateCheck(spreadCheck, 'pass', '✅', 
-            `Spread is ${data.spread_bps.toFixed(1)} bps (min: ${MIN_SPREAD_BPS} bps) - Wide enough to trade`);
-    } else if (data.can_average_down || data.can_sell) {
-        updateCheck(spreadCheck, 'warning', '⚡', 
-            `Spread tight (${data.spread_bps.toFixed(1)} bps < ${MIN_SPREAD_BPS} bps) but inventory management available`);
-    } else {
-        updateCheck(spreadCheck, 'fail', '⏸️', 
-            `Spread too tight: ${data.spread_bps.toFixed(1)} bps < ${MIN_SPREAD_BPS} bps minimum - No trading`);
-    }
-    
-    // 2. Inventory Check
-    const inventoryCheck = document.getElementById('checkInventory');
-    if (data.inventory_ratio > INVENTORY_SKEW_THRESHOLD) {
-        updateCheck(inventoryCheck, 'warning', '⚠️', 
-            `High inventory (${data.inventory_ratio}% > ${INVENTORY_SKEW_THRESHOLD}%) - Aggressive selling, limited buying`);
-    } else if (data.inventory_ratio > 40) {
-        updateCheck(inventoryCheck, 'info', '📊', 
-            `Moderate inventory (${data.inventory_ratio}%) - Normal operations with size skewing`);
-    } else {
-        updateCheck(inventoryCheck, 'pass', '✅', 
-            `Low inventory (${data.inventory_ratio}%) - Normal operations`);
-    }
-    
-    // 3. Buy Decision
-    const buyCheck = document.getElementById('checkBuy');
-    if (data.position >= 1000) {
-        updateCheck(buyCheck, 'fail', '🛑', 
-            `Max position reached (${data.position.toFixed(2)}/1000 USDHL) - No buying`);
-    } else if (data.inventory_ratio > INVENTORY_SKEW_THRESHOLD && !data.can_average_down) {
-        updateCheck(buyCheck, 'fail', '⏸️', 
-            `High inventory and price not below average - Blocking buys`);
-    } else if (data.can_average_down) {
-        const improvement = ((data.average_buy_price - data.mid_price) / data.average_buy_price * 10000).toFixed(1);
-        updateCheck(buyCheck, 'pass', '✅', 
-            `Can average down: Price ${improvement} bps below avg ${data.average_buy_price.toFixed(5)}`);
-    } else if (data.position === 0) {
-        updateCheck(buyCheck, 'pass', '💵', 
-            `No position - Can buy at market price ${data.mid_price.toFixed(5)}`);
-    } else {
-        updateCheck(buyCheck, 'warning', '⏸️', 
-            `Price ${data.mid_price.toFixed(5)} >= avg ${data.average_buy_price.toFixed(5)} - Would increase average`);
-    }
-    
-    // 4. Sell Decision
-    const sellCheck = document.getElementById('checkSell');
-    if (data.position === 0) {
-        updateCheck(sellCheck, 'info', '📭', 
-            `No position to sell`);
-    } else if (data.can_sell) {
-        const profit = ((data.mid_price - data.breakeven_price) / data.breakeven_price * 10000).toFixed(1);
-        updateCheck(sellCheck, 'pass', '💰', 
-            `Profitable: Price ${data.mid_price.toFixed(5)} >= breakeven ${data.breakeven_price.toFixed(5)} (+${profit} bps)`);
-    } else {
-        const needed = ((data.breakeven_price - data.mid_price) / data.mid_price * 10000).toFixed(1);
-        updateCheck(sellCheck, 'warning', '⏸️', 
-            `Waiting for profit: Need ${needed} bps more (breakeven: ${data.breakeven_price.toFixed(5)})`);
-    }
-}
-
-function updateCheck(element, status, icon, description) {
-    element.className = `check-item ${status}`;
-    element.querySelector('.check-icon').textContent = icon;
-    element.querySelector('.check-description').textContent = description;
-}
-
-async function fetchOrderEvents() {
-    const response = await fetch('/api/bot/order_events');
-    const events = await response.json();
-    
-    const container = document.getElementById('orderEventsList');
-    document.getElementById('orderEventCount').textContent = `${events.length} events`;
-    
-    if (events.length === 0) {
-        container.innerHTML = '<div class="loading">No order events yet</div>';
-        return;
-    }
-    
-    container.innerHTML = events.map(event => {
-        const date = new Date(event.timestamp);
-        const timeStr = date.toLocaleTimeString();
+async function fetchBotLogs() {
+    try {
+        // Fetch system events
+        const sysResponse = await fetch('/api/system/health');
+        const sysData = await sysResponse.json();
         
-        // Determine styling based on event type
-        let sideClass, icon, eventLabel;
-        if (event.event_type === 'placed') {
-            sideClass = event.side === 'buy' ? 'success' : 'info';
-            icon = event.side === 'buy' ? '✅' : '✅';
-            eventLabel = event.side.toUpperCase();
-        } else if (event.event_type === 'cancelled') {
-            sideClass = 'warning';
-            icon = '❌';
-            eventLabel = 'CANCEL';
-        } else {
-            sideClass = 'info';
-            icon = '📋';
-            eventLabel = event.event_type.toUpperCase();
+        // Fetch order events
+        const orderResponse = await fetch('/api/bot/order_events');
+        const orderEvents = await orderResponse.json();
+        
+        // Combine and sort all events
+        const allEvents = [];
+        
+        // Add system events
+        if (sysData.recent_events) {
+            sysData.recent_events.forEach(event => {
+                allEvents.push({
+                    timestamp: event.timestamp,
+                    type: event.type || 'system',
+                    severity: event.severity || 'info',
+                    message: event.message
+                });
+            });
         }
         
-        return `
-            <div class="log-item">
-                <div class="log-time">${timeStr}</div>
-                <div class="log-severity ${sideClass}">${eventLabel}</div>
-                <div class="log-content">
-                    <div class="log-type">${icon} ${event.amount.toFixed(2)} USDHL @ $${event.price.toFixed(5)}</div>
-                    <div class="log-message">${event.reason || 'Order ' + event.event_type} (ID: ${event.order_id})</div>
-                </div>
-            </div>
-        `;
-    }).join('');
+        // Add order events
+        orderEvents.forEach(event => {
+            const eventType = event.event_type === 'placed' ? 'order_placed' : 
+                            event.event_type === 'cancelled' ? 'order_cancelled' : 'order';
+            allEvents.push({
+                timestamp: event.timestamp,
+                type: eventType,
+                severity: event.side === 'buy' ? 'success' : 'info',
+                message: `${event.event_type.toUpperCase()} ${event.side.toUpperCase()}: ${event.amount.toFixed(2)} USDHL @ $${event.price.toFixed(5)} - ${event.reason}`
+            });
+        });
+        
+        // Sort by timestamp (newest first)
+        allEvents.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // Take last 100 events
+        const recentEvents = allEvents.slice(0, 100);
+        
+        updateTerminal(recentEvents);
+    } catch (error) {
+        console.error('Error fetching logs:', error);
+    }
 }
 
-async function fetchRecentActivity() {
-    const response = await fetch('/api/trades/recent');
-    const trades = await response.json();
+function updateTerminal(events) {
+    const terminal = document.getElementById('terminalBody');
     
-    const container = document.getElementById('recentActivityList');
-    document.getElementById('recentActivityCount').textContent = `Last ${Math.min(trades.length, 10)} trades`;
-    
-    if (trades.length === 0) {
-        container.innerHTML = '<div class="loading">No filled trades yet</div>';
-        return;
-    }
-    
-    container.innerHTML = trades.slice(0, 10).map(trade => {
-        const date = new Date(trade.timestamp);
+    // Clear and rebuild
+    terminal.innerHTML = events.map(event => {
+        const date = new Date(event.timestamp);
         const timeStr = date.toLocaleTimeString();
-        const sideClass = trade.side === 'buy' ? 'success' : 'info';
-        const sideIcon = trade.side === 'buy' ? '📈' : '📉';
+        const typeLabel = `[${event.type.toUpperCase()}]`;
         
         return `
-            <div class="log-item">
-                <div class="log-time">${timeStr}</div>
-                <div class="log-severity ${sideClass}">${trade.side}</div>
-                <div class="log-content">
-                    <div class="log-type">${sideIcon} ${trade.amount.toFixed(2)} USDHL @ $${trade.price.toFixed(5)}</div>
-                    <div class="log-message">Total: $${trade.cost.toFixed(2)}</div>
-                </div>
+            <div class="terminal-line ${event.severity}">
+                <span class="terminal-prompt">${timeStr} ${typeLabel}</span>
+                <span class="terminal-text">${event.message}</span>
             </div>
         `;
     }).join('');
+    
+    // Auto-scroll to bottom if enabled
+    if (autoScroll) {
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+}
+
+function clearTerminal() {
+    const terminal = document.getElementById('terminalBody');
+    terminal.innerHTML = `
+        <div class="terminal-line info">
+            <span class="terminal-prompt">[SYSTEM]</span>
+            <span class="terminal-text">Terminal cleared</span>
+        </div>
+    `;
+}
+
+function toggleAutoScroll() {
+    autoScroll = !autoScroll;
+    document.getElementById('autoScrollBtn').textContent = `Auto-scroll: ${autoScroll ? 'ON' : 'OFF'}`;
 }
 
 // Chart Initialization

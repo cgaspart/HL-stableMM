@@ -542,138 +542,24 @@
 
             <!-- LOGS PAGE -->
             <div class="page" id="page-logs">
-                <!-- Bot Configuration -->
-                <div class="config-card">
-                    <div class="config-header">
-                        <h3>Bot Configuration</h3>
-                        <span class="config-badge">Active Strategy</span>
-                    </div>
-                    <div class="config-grid">
-                        <div class="config-item">
-                            <span class="config-label">Order Size</span>
-                            <span class="config-value">100 USDHL</span>
+                <div class="terminal-container">
+                    <div class="terminal-header">
+                        <div class="terminal-title">
+                            <span class="terminal-icon">▶</span>
+                            <span>Bot Logs</span>
                         </div>
-                        <div class="config-item">
-                            <span class="config-label">Max Position</span>
-                            <span class="config-value">1000 USDHL</span>
-                        </div>
-                        <div class="config-item">
-                            <span class="config-label">Min Spread</span>
-                            <span class="config-value">3 bps</span>
-                        </div>
-                        <div class="config-item">
-                            <span class="config-label">Maker Fee</span>
-                            <span class="config-value">0.04%</span>
-                        </div>
-                        <div class="config-item">
-                            <span class="config-label">Sell Tranches</span>
-                            <span class="config-value">4 levels</span>
-                        </div>
-                        <div class="config-item">
-                            <span class="config-label">Inventory Skew</span>
-                            <span class="config-value">60% threshold</span>
+                        <div class="terminal-controls">
+                            <button class="terminal-btn" onclick="clearTerminal()">Clear</button>
+                            <button class="terminal-btn" onclick="toggleAutoScroll()">
+                                <span id="autoScrollBtn">Auto-scroll: ON</span>
+                            </button>
                         </div>
                     </div>
-                </div>
-
-                <!-- Bot State Card -->
-                <div class="state-card">
-                    <div class="state-header">
-                        <h3>Current Bot State</h3>
-                        <span class="state-badge" id="botStateStatus">Active</span>
-                    </div>
-                    
-                    <div class="state-grid">
-                        <div class="state-item">
-                            <div class="state-label">Position</div>
-                            <div class="state-value" id="statPosition">0 USDHL</div>
-                            <div class="state-progress">
-                                <div class="progress-bar" id="positionProgress"></div>
-                            </div>
-                            <div class="state-subtext" id="statInventoryRatio">0% of max</div>
+                    <div class="terminal-body" id="terminalBody">
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">[SYSTEM]</span>
+                            <span class="terminal-text">Connecting to bot...</span>
                         </div>
-                        
-                        <div class="state-item">
-                            <div class="state-label">Average Buy Price</div>
-                            <div class="state-value" id="statAvgPrice">$0.00000</div>
-                            <div class="state-subtext">Breakeven: <span id="statBreakeven">$0.00000</span></div>
-                        </div>
-                        
-                        <div class="state-item">
-                            <div class="state-label">Current Mid Price</div>
-                            <div class="state-value" id="statMidPrice">$0.00000</div>
-                            <div class="state-subtext">Spread: <span id="statSpread">0.0 bps</span></div>
-                        </div>
-                        
-                        <div class="state-item">
-                            <div class="state-label">USDC Balance</div>
-                            <div class="state-value" id="statUsdcBalance">$0.00</div>
-                            <div class="state-subtext">Available for trading</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Decision Logic -->
-                <div class="decision-card">
-                    <div class="decision-header">
-                        <h3>Decision Logic</h3>
-                        <span class="decision-subtitle">Current trading conditions</span>
-                    </div>
-                    
-                    <div class="decision-checks">
-                        <div class="check-item" id="checkSpread">
-                            <div class="check-icon">⏸️</div>
-                            <div class="check-content">
-                                <div class="check-title">Spread Check</div>
-                                <div class="check-description">Checking if spread is wide enough...</div>
-                            </div>
-                        </div>
-                        
-                        <div class="check-item" id="checkInventory">
-                            <div class="check-icon">📊</div>
-                            <div class="check-content">
-                                <div class="check-title">Inventory Check</div>
-                                <div class="check-description">Checking inventory levels...</div>
-                            </div>
-                        </div>
-                        
-                        <div class="check-item" id="checkBuy">
-                            <div class="check-icon">💵</div>
-                            <div class="check-content">
-                                <div class="check-title">Buy Decision</div>
-                                <div class="check-description">Evaluating buy conditions...</div>
-                            </div>
-                        </div>
-                        
-                        <div class="check-item" id="checkSell">
-                            <div class="check-icon">💰</div>
-                            <div class="check-content">
-                                <div class="check-title">Sell Decision</div>
-                                <div class="check-description">Evaluating sell conditions...</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Order Events -->
-                <div class="logs-card">
-                    <div class="logs-header">
-                        <h3>Order Events</h3>
-                        <span class="event-count" id="orderEventCount">Recent orders</span>
-                    </div>
-                    <div class="logs-list" id="orderEventsList">
-                        <div class="loading">Loading order events...</div>
-                    </div>
-                </div>
-
-                <!-- Recent Activity -->
-                <div class="logs-card">
-                    <div class="logs-header">
-                        <h3>Filled Trades</h3>
-                        <span class="event-count" id="recentActivityCount">Last 10 trades</span>
-                    </div>
-                    <div class="logs-list" id="recentActivityList">
-                        <div class="loading">Loading activity...</div>
                     </div>
                 </div>
             </div>

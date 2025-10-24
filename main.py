@@ -400,12 +400,17 @@ def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
     if spread_bps < MIN_SPREAD_BPS:
         if can_average_down or can_sell_profit:
             log(f"⚡ Spread tight ({spread_bps:.2f} bps) but inventory management available:")
+            log_system_event('spread_check', 'warning', 
+                           f"Spread tight ({spread_bps:.2f} bps) but inventory management available",
+                           f"can_average_down={can_average_down}, can_sell_profit={can_sell_profit}")
             if can_average_down:
                 log(f"   ✅ Can average down: {highest_bid:.5f} < avg {average_buy_price:.5f}")
             if can_sell_profit:
                 log(f"   ✅ Can sell at profit: {lowest_ask:.5f} >= breakeven {breakeven_price:.5f}")
         else:
             log(f"⏸️ Spread too tight: {spread_bps:.2f} bps < {MIN_SPREAD_BPS} bps minimum (no inventory actions available)")
+            log_system_event('spread_check', 'info', 
+                           f"Spread too tight: {spread_bps:.2f} bps < {MIN_SPREAD_BPS} bps minimum - No trading", '')
             return None, None
     
     # Aggressive inventory management for stablecoins
@@ -422,9 +427,13 @@ def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
                 if price_improvement_bps >= AVERAGE_DOWN_THRESHOLD_BPS:
                     should_block_buy = False
                     log(f"⚡ High inventory ({position:.2f}) but price {price_improvement_bps:.1f} bps below avg - allowing buy")
+                    log_system_event('inventory_management', 'warning', 
+                                   f"High inventory ({position:.2f}) but allowing buy - price {price_improvement_bps:.1f} bps below avg", '')
             
             if should_block_buy:
                 log(f"⚠️ High inventory ({position:.2f}), only placing sell orders")
+                log_system_event('inventory_management', 'warning', 
+                               f"High inventory ({position:.2f}/{MAX_POSITION}) - Blocking buys, only selling", '')
                 bid_price = None
     
     # Only place sell if we have inventory and it's profitable
@@ -437,9 +446,14 @@ def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
             profit_per_unit = ask_price * (1 - MAKER_FEE) - average_buy_price
             total_profit = profit_per_unit * position
             log(f"💰 Profitable sell opportunity: ask={ask_price:.5f} >= breakeven={breakeven_price:.5f}, profit=${total_profit:.2f}")
+            log_system_event('sell_decision', 'info', 
+                           f"Profitable sell: ask={ask_price:.5f} >= breakeven={breakeven_price:.5f}", 
+                           f"Expected profit: ${total_profit:.2f}")
         else:
             # Not profitable yet - only place buy to average down
             log(f"⏸️ Waiting for profit: ask={ask_price:.5f} < breakeven={breakeven_price:.5f} (avg={average_buy_price:.5f})")
+            log_system_event('sell_decision', 'info', 
+                           f"Waiting for profit: ask={ask_price:.5f} < breakeven={breakeven_price:.5f}", '')
             ask_price = None
     
     return round(bid_price, 5) if bid_price else None, round(ask_price, 5) if ask_price else None
@@ -472,12 +486,16 @@ def place_orders(bid_price, ask_price, usdc_balance):
         if buy_price_with_fee >= average_buy_price:
             should_buy = False
             log(f"⏸️ Skipping buy: price with fee {buy_price_with_fee:.5f} >= avg {average_buy_price:.5f} (would increase average)")
+            log_system_event('buy_decision', 'info', 
+                           f"Skipping buy: would increase average ({buy_price_with_fee:.5f} >= {average_buy_price:.5f})", '')
         else:
             # Calculate new average after this buy
             new_total_cost = average_buy_price * position + buy_price_with_fee * buy_size
             new_position = position + buy_size
             new_average = new_total_cost / new_position
             log(f"✅ Averaging down: {buy_price_with_fee:.5f} < {average_buy_price:.5f}, new avg will be {new_average:.5f}")
+            log_system_event('buy_decision', 'info', 
+                           f"Averaging down: {buy_price_with_fee:.5f} < {average_buy_price:.5f}, new avg: {new_average:.5f}", '')
     
     if bid_price and should_buy and position < MAX_POSITION and usdc_balance >= usdc_needed:
         try:
