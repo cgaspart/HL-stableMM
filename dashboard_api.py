@@ -674,6 +674,87 @@ def get_unrealized_pnl_history():
     conn.close()
     return jsonify(history)
 
+@app.route('/api/bot/state')
+def get_bot_state():
+    """Get current bot configuration and state"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get latest position
+    cursor.execute('''
+        SELECT position, average_buy_price, usdc_balance, timestamp
+        FROM position_snapshots
+        ORDER BY timestamp DESC LIMIT 1
+    ''')
+    position_data = cursor.fetchone()
+    
+    # Get latest market data
+    cursor.execute('''
+        SELECT mid_price, best_bid, best_ask, spread_bps
+        FROM market_snapshots
+        ORDER BY timestamp DESC LIMIT 1
+    ''')
+    market_data = cursor.fetchone()
+    
+    conn.close()
+    
+    # Calculate derived metrics
+    position = position_data['position'] if position_data else 0
+    avg_price = position_data['average_buy_price'] if position_data else 0
+    mid_price = market_data['mid_price'] if market_data else 0
+    
+    # Calculate inventory ratio and breakeven
+    max_position = 1000  # From config
+    inventory_ratio = (position / max_position * 100) if max_position > 0 else 0
+    breakeven_price = avg_price / (1 - MAKER_FEE) if avg_price > 0 else 0
+    
+    # Determine bot decision state
+    can_buy = position < max_position
+    can_sell = position > 0 and mid_price >= breakeven_price
+    can_average_down = position > 0 and market_data and market_data['best_bid'] * (1 + MAKER_FEE) < avg_price
+    
+    return jsonify({
+        'position': position,
+        'average_buy_price': avg_price,
+        'usdc_balance': position_data['usdc_balance'] if position_data else 0,
+        'inventory_ratio': round(inventory_ratio, 1),
+        'breakeven_price': breakeven_price,
+        'mid_price': mid_price,
+        'spread_bps': market_data['spread_bps'] if market_data else 0,
+        'can_buy': can_buy,
+        'can_sell': can_sell,
+        'can_average_down': can_average_down,
+        'last_update': position_data['timestamp'] if position_data else None
+    })
+
+@app.route('/api/bot/decisions')
+def get_bot_decisions():
+    """Get recent bot decision logs from order events"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT timestamp, order_id, event_type, side, price, amount, reason
+        FROM order_events
+        ORDER BY timestamp DESC
+        LIMIT 50
+    ''')
+    
+    events = []
+    for row in cursor.fetchall():
+        events.append({
+            'timestamp': row['timestamp'],
+            'order_id': row['order_id'],
+            'event_type': row['event_type'],
+            'side': row['side'],
+            'price': row['price'],
+            'amount': row['amount'],
+            'reason': row['reason']
+        })
+    
+    conn.close()
+    return jsonify(events)
+
 @app.route('/api/system/health')
 def get_system_health():
     """Get system health metrics"""

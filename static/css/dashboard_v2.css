@@ -896,6 +896,236 @@ body {
     }
 }
 
+/* Bot State Card */
+.state-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+}
+
+.state-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.state-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.state-badge {
+    padding: 6px 16px;
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.state-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.state-item {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.state-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.state-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.state-progress {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), var(--accent-primary));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.state-subtext {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.decision-indicators {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+.indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.indicator.active {
+    border-color: var(--success);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.indicator.inactive {
+    border-color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.indicator-icon {
+    font-size: 24px;
+}
+
+.indicator-text {
+    flex: 1;
+}
+
+.indicator-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.indicator-status {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Logs Card */
+.logs-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.logs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.logs-header h3 {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.event-count {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.logs-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.log-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s;
+}
+
+.log-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.log-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 80px;
+    font-family: 'Courier New', monospace;
+}
+
+.log-severity {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    min-width: 60px;
+    text-align: center;
+}
+
+.log-severity.info {
+    background: rgba(6, 182, 212, 0.1);
+    color: var(--info);
+}
+
+.log-severity.warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--warning);
+}
+
+.log-severity.error {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+.log-severity.success {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+}
+
+.log-content {
+    flex: 1;
+}
+
+.log-type {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.log-message {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;

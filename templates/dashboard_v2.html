@@ -57,6 +57,17 @@
                 </svg>
                 <span>Risk</span>
             </a>
+            
+            <a href="#logs" class="nav-item" data-page="logs">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <path d="M14 2v6h6"/>
+                    <path d="M16 13H8"/>
+                    <path d="M16 17H8"/>
+                    <path d="M10 9H8"/>
+                </svg>
+                <span>Logs</span>
+            </a>
         </div>
         
         <div class="sidebar-footer">
@@ -525,6 +536,83 @@
                         <div class="chart-container">
                             <canvas id="riskPositionChart"></canvas>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- LOGS PAGE -->
+            <div class="page" id="page-logs">
+                <!-- Bot State Card -->
+                <div class="state-card">
+                    <div class="state-header">
+                        <h3>Bot State</h3>
+                        <span class="state-badge" id="botStateStatus">Active</span>
+                    </div>
+                    
+                    <div class="state-grid">
+                        <div class="state-item">
+                            <div class="state-label">Position</div>
+                            <div class="state-value" id="statPosition">0 USDHL</div>
+                            <div class="state-progress">
+                                <div class="progress-bar" id="positionProgress"></div>
+                            </div>
+                            <div class="state-subtext" id="statInventoryRatio">0% of max</div>
+                        </div>
+                        
+                        <div class="state-item">
+                            <div class="state-label">Average Buy Price</div>
+                            <div class="state-value" id="statAvgPrice">$0.00000</div>
+                            <div class="state-subtext">Breakeven: <span id="statBreakeven">$0.00000</span></div>
+                        </div>
+                        
+                        <div class="state-item">
+                            <div class="state-label">Current Mid Price</div>
+                            <div class="state-value" id="statMidPrice">$0.00000</div>
+                            <div class="state-subtext">Spread: <span id="statSpread">0.0 bps</span></div>
+                        </div>
+                        
+                        <div class="state-item">
+                            <div class="state-label">USDC Balance</div>
+                            <div class="state-value" id="statUsdcBalance">$0.00</div>
+                            <div class="state-subtext">Available for trading</div>
+                        </div>
+                    </div>
+                    
+                    <div class="decision-indicators">
+                        <div class="indicator" id="indicatorBuy">
+                            <div class="indicator-icon">📊</div>
+                            <div class="indicator-text">
+                                <div class="indicator-title">Can Buy</div>
+                                <div class="indicator-status">Checking...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="indicator" id="indicatorSell">
+                            <div class="indicator-icon">💰</div>
+                            <div class="indicator-text">
+                                <div class="indicator-title">Can Sell</div>
+                                <div class="indicator-status">Checking...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="indicator" id="indicatorAvgDown">
+                            <div class="indicator-icon">📉</div>
+                            <div class="indicator-text">
+                                <div class="indicator-title">Can Average Down</div>
+                                <div class="indicator-status">Checking...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Events -->
+                <div class="logs-card">
+                    <div class="logs-header">
+                        <h3>System Events</h3>
+                        <span class="event-count" id="eventCount">0 events</span>
+                    </div>
+                    <div class="logs-list" id="systemEventsList">
+                        <div class="loading">Loading events...</div>
                     </div>
                 </div>
             </div>

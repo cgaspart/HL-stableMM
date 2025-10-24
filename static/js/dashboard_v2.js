@@ -64,7 +64,8 @@ function switchPage(page) {
         overview: 'Overview',
         trading: 'Trading',
         performance: 'Performance',
-        risk: 'Risk Management'
+        risk: 'Risk Management',
+        logs: 'Bot Logs'
     };
     document.getElementById('pageTitle').textContent = titles[page];
     
@@ -98,7 +99,9 @@ async function fetchAllData() {
             fetchTradeHistory(),
             fetchPositionHistory(),
             fetchSpreadHistory(),
-            fetchUnrealizedPnlHistory()
+            fetchUnrealizedPnlHistory(),
+            fetchBotState(),
+            fetchSystemEvents()
         ]);
         updateConnectionStatus(true);
     } catch (error) {
@@ -436,6 +439,67 @@ async function fetchUnrealizedPnlHistory() {
         }));
         state.charts.unrealizedPnl.update('none');
     }
+}
+
+async function fetchBotState() {
+    const response = await fetch('/api/bot/state');
+    const data = await response.json();
+    
+    // Update state values
+    document.getElementById('statPosition').textContent = `${data.position.toFixed(2)} USDHL`;
+    document.getElementById('statInventoryRatio').textContent = `${data.inventory_ratio}% of max`;
+    document.getElementById('statAvgPrice').textContent = `$${data.average_buy_price.toFixed(5)}`;
+    document.getElementById('statBreakeven').textContent = `$${data.breakeven_price.toFixed(5)}`;
+    document.getElementById('statMidPrice').textContent = `$${data.mid_price.toFixed(5)}`;
+    document.getElementById('statSpread').textContent = `${data.spread_bps.toFixed(1)} bps`;
+    document.getElementById('statUsdcBalance').textContent = `$${data.usdc_balance.toFixed(2)}`;
+    
+    // Update progress bar
+    const progressBar = document.getElementById('positionProgress');
+    progressBar.style.width = `${Math.min(data.inventory_ratio, 100)}%`;
+    
+    // Update decision indicators
+    updateIndicator('indicatorBuy', data.can_buy, 
+        data.can_buy ? 'Position below max limit' : 'Max position reached');
+    updateIndicator('indicatorSell', data.can_sell, 
+        data.can_sell ? 'Price above breakeven' : 'Waiting for profitable price');
+    updateIndicator('indicatorAvgDown', data.can_average_down, 
+        data.can_average_down ? 'Price below average' : 'Price at or above average');
+}
+
+function updateIndicator(id, isActive, statusText) {
+    const indicator = document.getElementById(id);
+    indicator.className = 'indicator ' + (isActive ? 'active' : 'inactive');
+    indicator.querySelector('.indicator-status').textContent = statusText;
+}
+
+async function fetchSystemEvents() {
+    const response = await fetch('/api/system/health');
+    const data = await response.json();
+    
+    const container = document.getElementById('systemEventsList');
+    document.getElementById('eventCount').textContent = `${data.recent_events.length} events`;
+    
+    if (data.recent_events.length === 0) {
+        container.innerHTML = '<div class="loading">No recent events</div>';
+        return;
+    }
+    
+    container.innerHTML = data.recent_events.map(event => {
+        const date = new Date(event.timestamp);
+        const timeStr = date.toLocaleTimeString();
+        
+        return `
+            <div class="log-item">
+                <div class="log-time">${timeStr}</div>
+                <div class="log-severity ${event.severity}">${event.severity}</div>
+                <div class="log-content">
+                    <div class="log-type">${event.type}</div>
+                    <div class="log-message">${event.message}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // Chart Initialization
