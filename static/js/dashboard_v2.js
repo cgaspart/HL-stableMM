@@ -97,7 +97,8 @@ async function fetchAllData() {
             fetchCurrentPosition(),
             fetchTradeHistory(),
             fetchPositionHistory(),
-            fetchSpreadHistory()
+            fetchSpreadHistory(),
+            fetchUnrealizedPnlHistory()
         ]);
         updateConnectionStatus(true);
     } catch (error) {
@@ -197,6 +198,15 @@ async function fetchPerformanceMetrics() {
     
     // Overview page ROI
     document.getElementById('roiValue').textContent = `${data.roi_pct.toFixed(2)}%`;
+    
+    // Update Trade Distribution chart
+    if (state.charts.tradeDist) {
+        state.charts.tradeDist.data.datasets[0].data = [
+            data.total_winning_trades,
+            data.total_losing_trades
+        ];
+        state.charts.tradeDist.update('none');
+    }
 }
 
 async function fetchPnlBreakdown() {
@@ -375,16 +385,9 @@ async function fetchPositionHistory() {
     if (state.charts.inventoryHeatmap) {
         const heatmapData = history.map(h => {
             const pct = (h.position / maxPosition * 100);
-            let color;
-            if (pct < 40) color = 'rgba(16, 185, 129, 0.6)';
-            else if (pct < 70) color = 'rgba(6, 182, 212, 0.6)';
-            else if (pct < 90) color = 'rgba(245, 158, 11, 0.6)';
-            else color = 'rgba(239, 68, 68, 0.6)';
-            
             return {
                 x: h.timestamp,
-                y: pct,
-                backgroundColor: color
+                y: pct
             };
         });
         
@@ -416,6 +419,22 @@ async function fetchSpreadHistory() {
             y: h.spread_bps
         }));
         state.charts.spread.update('none');
+    }
+}
+
+async function fetchUnrealizedPnlHistory() {
+    const response = await fetch('/api/performance/unrealized_pnl_history');
+    const history = await response.json();
+    
+    if (history.length === 0) return;
+    
+    // Update unrealized P&L chart
+    if (state.charts.unrealizedPnl) {
+        state.charts.unrealizedPnl.data.datasets[0].data = history.map(h => ({
+            x: h.timestamp,
+            y: h.unrealized_pnl
+        }));
+        state.charts.unrealizedPnl.update('none');
     }
 }
 
@@ -587,7 +606,16 @@ function initCharts() {
             datasets: [{
                 label: 'Inventory Risk %',
                 data: [],
-                backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                backgroundColor: (context) => {
+                    if (!context.parsed || context.parsed.y === undefined) {
+                        return 'rgba(99, 102, 241, 0.6)';
+                    }
+                    const pct = context.parsed.y;
+                    if (pct < 40) return 'rgba(16, 185, 129, 0.6)';
+                    else if (pct < 70) return 'rgba(6, 182, 212, 0.6)';
+                    else if (pct < 90) return 'rgba(245, 158, 11, 0.6)';
+                    else return 'rgba(239, 68, 68, 0.6)';
+                },
                 borderWidth: 0
             }]
         },

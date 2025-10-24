@@ -635,6 +635,45 @@ def get_open_positions():
         }
     })
 
+@app.route('/api/performance/unrealized_pnl_history')
+def get_unrealized_pnl_history():
+    """Get unrealized P&L history over time"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get position snapshots with corresponding market prices
+    cursor.execute('''
+        SELECT 
+            ps.timestamp,
+            ps.position,
+            ps.average_buy_price,
+            ms.mid_price
+        FROM position_snapshots ps
+        LEFT JOIN market_snapshots ms ON ABS(ps.timestamp - ms.timestamp) < 5000
+        WHERE ps.position > 0
+        ORDER BY ps.timestamp ASC
+    ''')
+    
+    history = []
+    for row in cursor.fetchall():
+        if row['mid_price'] and row['position'] > 0:
+            position = row['position']
+            avg_price = row['average_buy_price']
+            current_price = row['mid_price']
+            
+            # Calculate unrealized P&L (accounting for fees)
+            cost_basis = avg_price * position
+            current_value = current_price * (1 - MAKER_FEE) * position
+            unrealized_pnl = current_value - cost_basis
+            
+            history.append({
+                'timestamp': row['timestamp'],
+                'unrealized_pnl': round(unrealized_pnl, 4)
+            })
+    
+    conn.close()
+    return jsonify(history)
+
 @app.route('/api/system/health')
 def get_system_health():
     """Get system health metrics"""
