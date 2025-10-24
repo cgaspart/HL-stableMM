@@ -567,6 +567,74 @@ def get_pnl_breakdown():
         'monthly': monthly
     })
 
+@app.route('/api/positions/open')
+def get_open_positions():
+    """Get current position with weighted average cost basis"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Get latest position snapshot
+    cursor.execute('''
+        SELECT position, average_buy_price, timestamp
+        FROM position_snapshots
+        ORDER BY timestamp DESC
+        LIMIT 1
+    ''')
+    snapshot = cursor.fetchone()
+    
+    # Get all buy trades to show purchase history
+    cursor.execute('''
+        SELECT side, price, amount, timestamp
+        FROM trades
+        ORDER BY timestamp DESC
+        LIMIT 50
+    ''')
+    recent_trades = cursor.fetchall()
+    
+    conn.close()
+    
+    if not snapshot or snapshot['position'] <= 0:
+        return jsonify({
+            'positions': [],
+            'summary': {
+                'total_positions': 0,
+                'total_amount': 0,
+                'average_price': 0
+            }
+        })
+    
+    current_position = snapshot['position']
+    average_price = snapshot['average_buy_price']
+    
+    # Calculate breakeven price (need to cover sell fee)
+    breakeven_price = average_price / (1 - MAKER_FEE) if average_price > 0 else 0
+    
+    # Get recent buy trades for display (not FIFO, just history)
+    buy_trades = [t for t in recent_trades if t['side'] == 'buy'][:10]
+    
+    # Format recent buys for display
+    positions = []
+    for trade in buy_trades:
+        price_with_fee = trade['price'] * (1 + MAKER_FEE)
+        positions.append({
+            'timestamp': trade['timestamp'],
+            'price': trade['price'],
+            'price_with_fee': price_with_fee,
+            'amount': trade['amount'],
+            'cost_basis': price_with_fee * trade['amount']
+        })
+    
+    return jsonify({
+        'positions': positions,
+        'summary': {
+            'total_positions': 1,  # Single weighted average position
+            'total_amount': current_position,
+            'average_price': average_price,
+            'breakeven_price': breakeven_price,
+            'cost_basis': average_price * current_position
+        }
+    })
+
 @app.route('/api/system/health')
 def get_system_health():
     """Get system health metrics"""

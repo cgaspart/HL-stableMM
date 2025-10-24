@@ -194,51 +194,39 @@ async function fetchOpenPositions() {
         const data = await response.json();
         
         // Update summary stats
-        document.getElementById('totalOpenPositions').textContent = data.summary.total_positions;
         document.getElementById('totalOpenAmount').textContent = `${data.summary.total_amount.toFixed(2)} USDHL`;
         document.getElementById('openPositionsAvg').textContent = `$${data.summary.average_price.toFixed(5)}`;
         
+        // Update breakeven price if element exists
+        const breakevenEl = document.getElementById('breakevenPriceDisplay');
+        if (breakevenEl && data.summary.breakeven_price) {
+            breakevenEl.textContent = `$${data.summary.breakeven_price.toFixed(5)}`;
+        }
+        
         const tbody = document.getElementById('openPositionsTableBody');
         
-        if (data.positions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="no-data"><span>No open positions</span></td></tr>';
+        if (data.summary.total_amount === 0 || data.positions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="no-data"><span>No open position</span></td></tr>';
             return;
         }
         
-        tbody.innerHTML = data.positions.map((pos, index) => {
+        // Show recent buy trades (for reference, not FIFO)
+        tbody.innerHTML = data.positions.map((pos) => {
             const date = new Date(pos.timestamp);
             const timeStr = date.toLocaleTimeString();
             const dateStr = date.toLocaleDateString();
             
-            // Determine if position is partially filled
-            const isPartial = pos.remaining_amount < pos.original_amount;
-            const statusBadge = isPartial 
-                ? `<span class="status-badge partial">Partial (${((pos.remaining_amount / pos.original_amount) * 100).toFixed(0)}%)</span>`
-                : `<span class="status-badge open">Open</span>`;
-            
             return `
-                <tr class="position-row ${index === 0 ? 'oldest-position' : ''}">
-                    <td>
-                        <span class="position-order">#${index + 1}</span>
-                        ${index === 0 ? '<span class="badge-fifo">NEXT</span>' : ''}
-                    </td>
+                <tr class="position-row">
                     <td>
                         <div class="time-cell">
                             <div>${timeStr}</div>
                             <div class="time-date">${dateStr}</div>
                         </div>
                     </td>
-                    <td>${pos.remaining_amount.toFixed(2)} USDHL</td>
-                    <td>
-                        <div class="price-cell">
-                            <div class="price-main">$${pos.price_with_fee.toFixed(5)}</div>
-                            <div class="price-sub">Total: $${pos.cost_basis.toFixed(2)}</div>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="min-profitable">$${pos.min_profitable_price.toFixed(5)}</span>
-                    </td>
-                    <td>${statusBadge}</td>
+                    <td>$${pos.price.toFixed(5)}</td>
+                    <td>${pos.amount.toFixed(2)} USDHL</td>
+                    <td>$${pos.cost_basis.toFixed(2)}</td>
                 </tr>
             `;
         }).join('');
