@@ -727,9 +727,9 @@ def get_bot_state():
         'last_update': position_data['timestamp'] if position_data else None
     })
 
-@app.route('/api/bot/decisions')
-def get_bot_decisions():
-    """Get recent bot decision logs from order events"""
+@app.route('/api/bot/order_events')
+def get_order_events():
+    """Get recent order events (placed, cancelled, filled)"""
     conn = get_db_connection()
     cursor = conn.cursor()
     
@@ -737,14 +737,14 @@ def get_bot_decisions():
         SELECT timestamp, order_id, event_type, side, price, amount, reason
         FROM order_events
         ORDER BY timestamp DESC
-        LIMIT 50
+        LIMIT 30
     ''')
     
     events = []
     for row in cursor.fetchall():
         events.append({
             'timestamp': row['timestamp'],
-            'order_id': row['order_id'],
+            'order_id': row['order_id'][:8] if row['order_id'] else 'unknown',  # Truncate for display
             'event_type': row['event_type'],
             'side': row['side'],
             'price': row['price'],

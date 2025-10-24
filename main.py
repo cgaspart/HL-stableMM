@@ -311,6 +311,8 @@ def cancel_all_orders():
             for order in open_orders:
                 try:
                     exchange.cancelOrder(order['id'], USDHL_MARKET_ID)
+                    log_order_event(order['id'], 'cancelled', order.get('side', 'unknown'), 
+                                   order.get('price', 0), order.get('amount', 0), 'Requoting')
                     log(f"❌ Cancelled order {order['id']}")
                 except Exception as e:
                     log(f"Error cancelling order {order['id']}: {e}")
@@ -490,6 +492,7 @@ def place_orders(bid_price, ask_price, usdc_balance):
                 params
             )
             orders_placed.append(order)
+            log_order_event(order.get('id', 'unknown'), 'placed', 'buy', bid_price, buy_size, f"Cost: {usdc_needed:.2f} USDC")
             log(f"✅ BUY order placed: {buy_size} @ {bid_price} (Cost: {usdc_needed:.2f} USDC)")
         except Exception as e:
             log(f"❌ Error placing buy order: {e}")
@@ -540,6 +543,8 @@ def place_orders(bid_price, ask_price, usdc_balance):
                         sell_revenue_after_fee = tranche_price * (1 - MAKER_FEE)
                         expected_profit = (sell_revenue_after_fee - average_buy_price) * tranche_size
                         
+                        log_order_event(order.get('id', 'unknown'), 'placed', 'sell', round(tranche_price, 5), tranche_size, 
+                                       f"Tranche {i+1}/{SELL_TRANCHES}, +{price_improvement_bps} bps, profit: ${expected_profit:.4f}")
                         log(f"✅ SELL tranche {i+1}/{SELL_TRANCHES}: {tranche_size} @ {tranche_price:.5f} (+{price_improvement_bps} bps, profit: ${expected_profit:.4f})")
                     except Exception as e:
                         log(f"❌ Error placing sell tranche {i+1}: {e}")
@@ -564,6 +569,8 @@ def place_orders(bid_price, ask_price, usdc_balance):
                     sell_revenue_after_fee = ask_price * (1 - MAKER_FEE)
                     expected_profit = (sell_revenue_after_fee - average_buy_price) * actual_sell_size
                     
+                    log_order_event(order.get('id', 'unknown'), 'placed', 'sell', ask_price, actual_sell_size, 
+                                   f"Profit: ${expected_profit:.4f}, Avg: {average_buy_price:.5f}")
                     log(f"✅ SELL order placed: {actual_sell_size} @ {ask_price} (Profit: ${expected_profit:.4f}, Avg: {average_buy_price:.5f})")
                 except Exception as e:
                     log(f"❌ Error placing sell order: {e}")
