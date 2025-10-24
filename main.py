@@ -32,7 +32,8 @@ MIN_SPREAD_BPS = 3  # Minimum spread in basis points (0.03%) to trade
 INCREMENTAL_SELL = True  # Sell in tranches instead of all at once
 SELL_TRANCHES = 4  # Number of sell levels (25% each)
 TRANCHE_SPREAD_BPS = 2  # Additional spread per tranche in bps (0.02%)
-INVENTORY_SKEW_THRESHOLD = 0.6  # At 40% of max position, start aggressive skewing
+INVENTORY_SKEW_THRESHOLD = 0.6  # At 60% of max position, start aggressive skewing
+AVERAGE_DOWN_THRESHOLD_BPS = 20  # Only average down when high inventory if price is 20+ bps below average (0.2%)
 TARGET_INVENTORY = 0  # Target neutral inventory
 
 # Smart order management
@@ -408,13 +409,21 @@ def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
     # Aggressive inventory management for stablecoins
     if abs(inventory_ratio) > INVENTORY_SKEW_THRESHOLD:
         if inventory_ratio > INVENTORY_SKEW_THRESHOLD:
-            # Too long - only sell, no buying
-            log(f"⚠️ High inventory ({position:.2f}), only placing sell orders")
-            bid_price = None
-        elif inventory_ratio < -INVENTORY_SKEW_THRESHOLD:
-            # Too short - only buy, no selling
-            log(f"⚠️ Low inventory ({position:.2f}), only placing buy orders")
-            ask_price = None
+            # Too long - only sell, no buying UNLESS price is significantly below average
+            should_block_buy = True
+            
+            if can_average_down and average_buy_price > 0:
+                # Calculate how much better the price is (in bps)
+                buy_price_with_fee = highest_bid * (1 + MAKER_FEE)
+                price_improvement_bps = ((average_buy_price - buy_price_with_fee) / average_buy_price) * 10000
+                
+                if price_improvement_bps >= AVERAGE_DOWN_THRESHOLD_BPS:
+                    should_block_buy = False
+                    log(f"⚡ High inventory ({position:.2f}) but price {price_improvement_bps:.1f} bps below avg - allowing buy")
+            
+            if should_block_buy:
+                log(f"⚠️ High inventory ({position:.2f}), only placing sell orders")
+                bid_price = None
     
     # Only place sell if we have inventory and it's profitable
     if ask_price and position > 0 and average_buy_price > 0:
