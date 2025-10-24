@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import json
 import os
 import time
+from functools import wraps
 
 # Database configuration
 DB_PATH = os.getenv('DB_PATH', 'market_maker.db')
@@ -15,10 +16,30 @@ CORS(app)
 # Configuration - must match main.py
 MAKER_FEE = 0.0004  # 0.04% maker fee for Hyperliquid spot
 
+def retry_on_db_lock(max_retries=3, delay=0.5):
+    """Decorator to retry database operations on lock errors"""
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    if 'database is locked' in str(e) and attempt < max_retries - 1:
+                        time.sleep(delay * (attempt + 1))  # Exponential backoff
+                        continue
+                    raise
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
 def get_db_connection():
-    """Get database connection"""
-    conn = sqlite3.connect(DB_PATH)
+    """Get database connection with proper timeout and WAL mode"""
+    conn = sqlite3.connect(DB_PATH, timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    # Enable WAL mode for better concurrency
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
     return conn
 
 @app.route('/')
@@ -636,6 +657,7 @@ def get_open_positions():
     })
 
 @app.route('/api/performance/unrealized_pnl_history')
+@retry_on_db_lock(max_retries=5, delay=0.3)
 def get_unrealized_pnl_history():
     """Get unrealized P&L history over time"""
     conn = get_db_connection()

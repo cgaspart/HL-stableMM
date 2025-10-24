@@ -7,6 +7,14 @@ import os
 # Database configuration
 DB_PATH = os.getenv('DB_PATH', 'market_maker.db')
 
+def get_db_connection():
+    """Get database connection with proper timeout and WAL mode"""
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    # Enable WAL mode for better concurrency
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA busy_timeout=30000')  # 30 second timeout
+    return conn
+
 # load data from env
 
 exchange = ccxt.hyperliquid({
@@ -56,7 +64,7 @@ last_orderbook_update = 0
 # Database setup
 def init_database():
     """Initialize SQLite database for trade tracking"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Create trades table
@@ -142,7 +150,7 @@ def load_position_from_db():
     """Reconstruct position and average buy price from database"""
     global position, average_buy_price, processed_trade_ids
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Get all trades ordered by timestamp
@@ -181,7 +189,7 @@ def load_position_from_db():
 
 def save_trade_to_db(trade):
     """Save a trade to the database"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     trade_id = trade.get('id') or trade.get('order')
@@ -206,7 +214,7 @@ def save_trade_to_db(trade):
 
 def save_position_snapshot(usdc_balance):
     """Save current position snapshot"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -219,7 +227,7 @@ def save_position_snapshot(usdc_balance):
 
 def save_market_snapshot(mid_price, best_bid, best_ask, spread_bps, bid_depth, ask_depth):
     """Save market snapshot for spread and volatility tracking"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -232,7 +240,7 @@ def save_market_snapshot(mid_price, best_bid, best_ask, spread_bps, bid_depth, a
 
 def log_order_event(order_id, event_type, side, price, amount, reason=""):
     """Log order lifecycle events"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -245,7 +253,7 @@ def log_order_event(order_id, event_type, side, price, amount, reason=""):
 
 def log_system_event(event_type, severity, message, details=""):
     """Log system events for health monitoring"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('''
