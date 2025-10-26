@@ -41,7 +41,7 @@ INCREMENTAL_SELL = True  # Sell in tranches instead of all at once
 SELL_TRANCHES = 4  # Number of sell levels (25% each)
 TRANCHE_SPREAD_BPS = 2  # Additional spread per tranche in bps (0.02%)
 INVENTORY_SKEW_THRESHOLD = 0.6  # At 60% of max position, start aggressive skewing
-AVERAGE_DOWN_THRESHOLD_BPS = 20  # Only average down when high inventory if price is 20+ bps below average (0.2%)
+AVERAGE_DOWN_THRESHOLD_BPS = 10  # Only average down when high inventory if price is 20+ bps below average (0.2%)
 TARGET_INVENTORY = 0  # Target neutral inventory
 
 # Smart order management
