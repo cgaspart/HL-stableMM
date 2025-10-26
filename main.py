@@ -508,22 +508,28 @@ def place_orders(bid_price, ask_price, usdc_balance):
                            f"Averaging down: {buy_price_with_fee:.5f} < {average_buy_price:.5f}, new avg: {new_average:.5f}", '')
     
     if bid_price and should_buy and position < MAX_POSITION and usdc_balance >= usdc_needed:
-        try:
-            # Hyperliquid spot orders need specific params
-            params = {'vaultAddress': None}  # Use wallet, not vault for spot
-            order = exchange.create_order(
-                'USDHL/USDC', 
-                'limit', 
-                'buy', 
-                buy_size, 
-                bid_price,
-                params
-            )
-            orders_placed.append(order)
-            log_order_event(order.get('id', 'unknown'), 'placed', 'buy', bid_price, buy_size, f"Cost: {usdc_needed:.2f} USDC")
-            log(f"✅ BUY order placed: {buy_size} @ {bid_price} (Cost: {usdc_needed:.2f} USDC)")
-        except Exception as e:
-            log(f"❌ Error placing buy order: {e}")
+        # Don't place buy orders at or above 0.999
+        if bid_price >= 0.999:
+            log(f"⏸️ Skipping buy: price {bid_price:.5f} >= 0.999 threshold")
+            log_system_event('buy_decision', 'info', 
+                           f"Skipping buy: price {bid_price:.5f} >= 0.999 threshold", '')
+        else:
+            try:
+                # Hyperliquid spot orders need specific params
+                params = {'vaultAddress': None}  # Use wallet, not vault for spot
+                order = exchange.create_order(
+                    'USDHL/USDC', 
+                    'limit', 
+                    'buy', 
+                    buy_size, 
+                    bid_price,
+                    params
+                )
+                orders_placed.append(order)
+                log_order_event(order.get('id', 'unknown'), 'placed', 'buy', bid_price, buy_size, f"Cost: {usdc_needed:.2f} USDC")
+                log(f"✅ BUY order placed: {buy_size} @ {bid_price} (Cost: {usdc_needed:.2f} USDC)")
+            except Exception as e:
+                log(f"❌ Error placing buy order: {e}")
     elif position >= MAX_POSITION:
         log(f"⚠️ Max position reached ({position:.2f}/{MAX_POSITION})")
     elif usdc_balance < usdc_needed:
