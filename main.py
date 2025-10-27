@@ -623,10 +623,22 @@ def check_filled_orders():
         # Sort trades by timestamp (oldest first) to process in chronological order
         trades_sorted = sorted(trades, key=lambda t: t.get('timestamp', 0))
         
-        # Track position changes as we process trades
-        calc_position = position
+        # Start with current state
         calc_avg = average_buy_price
         new_trades_found = False
+        
+        # Calculate position BEFORE new trades by counting new trade amounts
+        new_trade_position_delta = 0
+        for trade in trades_sorted:
+            trade_id = trade.get('id') or trade.get('order')
+            if trade_id not in processed_trade_ids:
+                if trade['side'] == 'buy':
+                    new_trade_position_delta += trade['amount']
+                elif trade['side'] == 'sell':
+                    new_trade_position_delta -= trade['amount']
+        
+        # Position before new trades = current position - delta from new trades
+        calc_position = position - new_trade_position_delta
         
         # Process only new trades (ones we haven't seen before)
         for trade in trades_sorted:
@@ -647,8 +659,8 @@ def check_filled_orders():
             if trade['side'] == 'buy':
                 # Update average buy price based on this new buy (include maker fee in cost basis)
                 price_with_fee = trade['price'] * (1 + MAKER_FEE)
-                old_position = calc_position - trade['amount']
-                total_cost = calc_avg * old_position + price_with_fee * trade['amount']
+                total_cost = calc_avg * calc_position + price_with_fee * trade['amount']
+                calc_position += trade['amount']
                 calc_avg = total_cost / calc_position if calc_position > 0 else 0
                 
                 log(f"📈 Buy filled: {trade['amount']} @ {trade['price']} (cost basis with fee: {price_with_fee:.5f}), New Avg: {calc_avg:.5f}")
