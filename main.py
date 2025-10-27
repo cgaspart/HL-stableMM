@@ -401,6 +401,7 @@ def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
         can_average_down = buy_price_with_fee < average_buy_price
         
         # Check if we can sell at profit
+        # average_buy_price already includes buy fee, so we just need to cover sell fee
         breakeven_price = average_buy_price / (1 - MAKER_FEE)
         can_sell_profit = lowest_ask >= breakeven_price
     
@@ -448,7 +449,7 @@ def calculate_order_prices(mid_price, lowest_ask, highest_bid, spread_bps):
     
     # Only place sell if we have inventory and it's profitable
     if ask_price and position > 0 and average_buy_price > 0:
-        # Calculate breakeven price (need to cover buy fee + sell fee)
+        # Calculate breakeven price (average_buy_price already includes buy fee, just need to cover sell fee)
         breakeven_price = average_buy_price / (1 - MAKER_FEE)
         
         if ask_price >= breakeven_price:
@@ -638,7 +639,8 @@ def check_filled_orders():
                 # Update average buy price based on this new buy (include maker fee in cost basis)
                 # Note: position is already updated by update_position() from exchange balance
                 price_with_fee = trade['price'] * (1 + MAKER_FEE)
-                total_cost = average_buy_price * (position - trade['amount']) + price_with_fee * trade['amount']
+                old_position = position - trade['amount']
+                total_cost = average_buy_price * old_position + price_with_fee * trade['amount']
                 average_buy_price = total_cost / position if position > 0 else 0
                 
                 log(f"📈 Buy filled: {trade['amount']} @ {trade['price']} (cost basis with fee: {price_with_fee:.5f}), New Avg: {average_buy_price:.5f}")
