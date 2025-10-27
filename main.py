@@ -342,12 +342,6 @@ def update_position():
         position_diff = abs(actual_position - position)
         if position_diff > 0.1:
             log(f"🔄 Position sync: Exchange: {actual_position:.2f}, Tracked: {position:.2f}, Diff: {position_diff:.2f}")
-            
-            # Critical mismatch - FIFO queue is now unreliable
-            if position_diff > 100.0:  # Increased threshold - order placement causes temporary mismatches
-                log(f"🛑 CRITICAL MISMATCH (>{position_diff:.2f} units)! HALTING TRADING.")
-                log(f"🔧 Action required: Run reconciliation or restart bot after investigating.")
-                raise Exception(f"Position mismatch too large: {position_diff:.2f} units. Manual intervention required.")
         
         # Always sync to exchange value
         position = actual_position
@@ -543,9 +537,10 @@ def place_orders(bid_price, ask_price, usdc_balance):
         if INCREMENTAL_SELL and position > 50:  # Only use tranches for larger positions
             # Sell in multiple tranches at different price levels
             breakeven_price = average_buy_price / (1 - MAKER_FEE)
-            tranche_size = round(position / SELL_TRANCHES, 3)
+            base_tranche_size = round(position / SELL_TRANCHES, 3)
+            total_allocated = 0
             
-            log(f"📊 Incremental selling: {SELL_TRANCHES} tranches of ~{tranche_size:.2f} USDHL each")
+            log(f"📊 Incremental selling: {SELL_TRANCHES} tranches of ~{base_tranche_size:.2f} USDHL each")
             
             for i in range(SELL_TRANCHES):
                 # Each tranche at progressively better prices
@@ -558,7 +553,11 @@ def place_orders(bid_price, ask_price, usdc_balance):
                 
                 # Last tranche gets any remainder
                 if i == SELL_TRANCHES - 1:
-                    tranche_size = round(position * 0.99, 3)  # Sell remaining
+                    tranche_size = round((position * 0.99) - total_allocated, 3)  # Sell remaining
+                else:
+                    tranche_size = base_tranche_size
+                
+                total_allocated += tranche_size
                 
                 order_value = tranche_size * tranche_price
                 
@@ -621,13 +620,23 @@ def check_filled_orders():
         # Fetch recent trades
         trades = exchange.fetchMyTrades(USDHL_MARKET_ID, limit=20)
         
+        # Sort trades by timestamp (oldest first) to process in chronological order
+        trades_sorted = sorted(trades, key=lambda t: t.get('timestamp', 0))
+        
+        # Track position changes as we process trades
+        calc_position = position
+        calc_avg = average_buy_price
+        new_trades_found = False
+        
         # Process only new trades (ones we haven't seen before)
-        for trade in trades:
+        for trade in trades_sorted:
             trade_id = trade.get('id') or trade.get('order')
             
             # Skip if we've already processed this trade
             if trade_id in processed_trade_ids:
                 continue
+            
+            new_trades_found = True
             
             # Mark this trade as processed
             processed_trade_ids.add(trade_id)
@@ -637,26 +646,30 @@ def check_filled_orders():
             
             if trade['side'] == 'buy':
                 # Update average buy price based on this new buy (include maker fee in cost basis)
-                # Note: position is already updated by update_position() from exchange balance
                 price_with_fee = trade['price'] * (1 + MAKER_FEE)
-                old_position = position - trade['amount']
-                total_cost = average_buy_price * old_position + price_with_fee * trade['amount']
-                average_buy_price = total_cost / position if position > 0 else 0
+                old_position = calc_position - trade['amount']
+                total_cost = calc_avg * old_position + price_with_fee * trade['amount']
+                calc_avg = total_cost / calc_position if calc_position > 0 else 0
                 
-                log(f"📈 Buy filled: {trade['amount']} @ {trade['price']} (cost basis with fee: {price_with_fee:.5f}), New Avg: {average_buy_price:.5f}")
+                log(f"📈 Buy filled: {trade['amount']} @ {trade['price']} (cost basis with fee: {price_with_fee:.5f}), New Avg: {calc_avg:.5f}")
             
             elif trade['side'] == 'sell':
                 # Calculate profit
                 sell_revenue_after_fee = trade['price'] * (1 - MAKER_FEE)
-                profit = (sell_revenue_after_fee - average_buy_price) * trade['amount']
+                profit = (sell_revenue_after_fee - calc_avg) * trade['amount']
                 
                 log(f"📉 Sell filled: {trade['amount']} @ {trade['price']}, Net profit: ${profit:.4f}")
                 
-                # Position is already updated by update_position() from exchange
+                calc_position -= trade['amount']
+                
                 # Reset average if position is now near zero
-                if position <= 5:  # Less than 5 USDHL remaining
-                    average_buy_price = 0
+                if calc_position <= 5:  # Less than 5 USDHL remaining
+                    calc_avg = 0
                     log(f"🔄 Position cleared, resetting average")
+        
+        # Update global variables if we found new trades
+        if new_trades_found:
+            average_buy_price = calc_avg
         
         # Keep only recent trade IDs to prevent memory bloat (keep last 100)
         if len(processed_trade_ids) > 100:
