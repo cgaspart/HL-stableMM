@@ -26,8 +26,8 @@ exchange = ccxt.hyperliquid({
 
 # Configuration
 MAKER_FEE = 0.0004  # 0.04% maker fee for Hyperliquid spot
-ORDER_SIZE = 100  # Base size in USDHL per order
-MAX_POSITION = 1000  # Maximum inventory in USDHL (increased for more volume)
+ORDER_SIZE = 50  # Base size in USDHL per order
+MAX_POSITION = 500  # Maximum inventory in USDHL (increased for more volume)
 LOOP_INTERVAL = 3  # seconds between iterations (faster updates for more volume)
 TICK_SIZE = 0.00001  # Minimum price increment for USDHL/USDC
 SKEW_FACTOR = 2.0  # Multiplier for order size adjustment based on inventory
