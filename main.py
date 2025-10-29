@@ -484,8 +484,8 @@ def place_orders(bid_price, ask_price, usdc_balance):
     MIN_BUY_VALUE_USDC = 10.0
     if bid_price and usdc_needed < MIN_BUY_VALUE_USDC:
         # Adjust buy size to meet minimum order value
-        buy_size = MIN_BUY_VALUE_USDC / bid_price
-        usdc_needed = MIN_BUY_VALUE_USDC
+        buy_size = 11
+        usdc_needed = 11 * bid_price
         log(f"📊 Adjusted buy size to {buy_size:.3f} to meet minimum order value of {MIN_BUY_VALUE_USDC} USDC")
     
     # Place buy order if we have enough USDC and haven't hit max position
