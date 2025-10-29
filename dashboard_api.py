@@ -100,7 +100,7 @@ def get_stats():
     cursor.execute('''
         SELECT side, price, amount, cost, timestamp
         FROM trades
-        ORDER BY timestamp DESC
+        ORDER BY timestamp ASC
         LIMIT 100
     ''')
     recent_trades = cursor.fetchall()
@@ -109,7 +109,7 @@ def get_stats():
     realized_profit = 0
     if recent_trades:
         buy_queue = []
-        for trade in reversed(list(recent_trades)):
+        for trade in recent_trades:
             if trade['side'] == 'buy':
                 buy_queue.append({'price': trade['price'], 'amount': trade['amount']})
             elif trade['side'] == 'sell' and buy_queue:
