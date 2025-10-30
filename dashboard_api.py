@@ -106,29 +106,29 @@ def get_stats():
     recent_trades = cursor.fetchall()
     
     # Calculate approximate realized profit
+    # Match main.py logic: average_buy_price already includes buy fee
     realized_profit = 0
     if recent_trades:
-        buy_queue = []
+        position_tracker = 0
+        avg_buy_price = 0
+        
         for trade in recent_trades:
             if trade['side'] == 'buy':
-                buy_queue.append({'price': trade['price'], 'amount': trade['amount']})
-            elif trade['side'] == 'sell' and buy_queue:
-                sell_amount = trade['amount']
-                sell_price = trade['price']
+                # Include maker fee in the cost basis (same as main.py)
+                price_with_fee = trade['price'] * (1 + MAKER_FEE)
+                total_cost = avg_buy_price * position_tracker + price_with_fee * trade['amount']
+                position_tracker += trade['amount']
+                avg_buy_price = total_cost / position_tracker if position_tracker > 0 else 0
+            elif trade['side'] == 'sell':
+                # Calculate profit: avg_buy_price already includes buy fee
+                sell_revenue_after_fee = trade['price'] * (1 - MAKER_FEE)
+                profit = (sell_revenue_after_fee - avg_buy_price) * trade['amount']
+                realized_profit += profit
                 
-                while sell_amount > 0 and buy_queue:
-                    buy = buy_queue[0]
-                    matched_amount = min(sell_amount, buy['amount'])
-                    # Calculate net profit after fees
-                    buy_cost_with_fee = buy['price'] * (1 + MAKER_FEE)
-                    sell_revenue_after_fee = sell_price * (1 - MAKER_FEE)
-                    realized_profit += matched_amount * (sell_revenue_after_fee - buy_cost_with_fee)
-                    
-                    sell_amount -= matched_amount
-                    buy['amount'] -= matched_amount
-                    
-                    if buy['amount'] <= 0:
-                        buy_queue.pop(0)
+                position_tracker -= trade['amount']
+                if position_tracker <= 0:
+                    avg_buy_price = 0
+                    position_tracker = 0
     
     conn.close()
     
@@ -189,9 +189,11 @@ def get_trade_history():
     trades = cursor.fetchall()
     
     # Group by hour for performance chart
+    # Match main.py logic: average_buy_price already includes buy fee
     hourly_data = {}
     cumulative_profit = 0
-    buy_queue = []
+    position_tracker = 0
+    avg_buy_price = 0
     
     for trade in trades:
         # Trade timestamps are in milliseconds, convert to seconds first
@@ -209,28 +211,24 @@ def get_trade_history():
         hourly_data[hour_key]['volume'] += trade['cost']
         hourly_data[hour_key]['trades'] += 1
         
-        # Calculate profit
+        # Calculate profit (same as main.py)
         if trade['side'] == 'buy':
-            buy_queue.append({'price': trade['price'], 'amount': trade['amount']})
-        elif trade['side'] == 'sell' and buy_queue:
-            sell_amount = trade['amount']
-            sell_price = trade['price']
+            # Include maker fee in the cost basis
+            price_with_fee = trade['price'] * (1 + MAKER_FEE)
+            total_cost = avg_buy_price * position_tracker + price_with_fee * trade['amount']
+            position_tracker += trade['amount']
+            avg_buy_price = total_cost / position_tracker if position_tracker > 0 else 0
+        elif trade['side'] == 'sell':
+            # avg_buy_price already includes buy fee
+            sell_revenue_after_fee = trade['price'] * (1 - MAKER_FEE)
+            profit = (sell_revenue_after_fee - avg_buy_price) * trade['amount']
+            cumulative_profit += profit
+            hourly_data[hour_key]['profit'] += profit
             
-            while sell_amount > 0 and buy_queue:
-                buy = buy_queue[0]
-                matched_amount = min(sell_amount, buy['amount'])
-                # Calculate net profit after fees
-                buy_cost_with_fee = buy['price'] * (1 + MAKER_FEE)
-                sell_revenue_after_fee = sell_price * (1 - MAKER_FEE)
-                profit = matched_amount * (sell_revenue_after_fee - buy_cost_with_fee)
-                cumulative_profit += profit
-                hourly_data[hour_key]['profit'] += profit
-                
-                sell_amount -= matched_amount
-                buy['amount'] -= matched_amount
-                
-                if buy['amount'] <= 0:
-                    buy_queue.pop(0)
+            position_tracker -= trade['amount']
+            if position_tracker <= 0:
+                avg_buy_price = 0
+                position_tracker = 0
     
     conn.close()
     
@@ -456,7 +454,9 @@ def get_performance_stats():
         })
     
     # Calculate profit factor and other metrics
-    buy_queue = []
+    # Match main.py logic: average_buy_price already includes buy fee
+    position_tracker = 0
+    avg_buy_price = 0
     total_profit = 0
     total_loss = 0
     winning_trades = 0
@@ -468,29 +468,27 @@ def get_performance_stats():
         total_fees += fee
         
         if trade['side'] == 'buy':
+            # Include maker fee in the cost basis
             price_with_fee = trade['price'] * (1 + MAKER_FEE)
-            buy_queue.append({'price': price_with_fee, 'amount': trade['amount']})
-        elif trade['side'] == 'sell' and buy_queue:
-            sell_amount = trade['amount']
-            sell_price = trade['price'] * (1 - MAKER_FEE)
+            total_cost = avg_buy_price * position_tracker + price_with_fee * trade['amount']
+            position_tracker += trade['amount']
+            avg_buy_price = total_cost / position_tracker if position_tracker > 0 else 0
+        elif trade['side'] == 'sell':
+            # avg_buy_price already includes buy fee
+            sell_revenue_after_fee = trade['price'] * (1 - MAKER_FEE)
+            profit = (sell_revenue_after_fee - avg_buy_price) * trade['amount']
             
-            while sell_amount > 0 and buy_queue:
-                buy = buy_queue[0]
-                matched_amount = min(sell_amount, buy['amount'])
-                profit = matched_amount * (sell_price - buy['price'])
-                
-                if profit > 0:
-                    total_profit += profit
-                    winning_trades += 1
-                else:
-                    total_loss += abs(profit)
-                    losing_trades += 1
-                
-                sell_amount -= matched_amount
-                buy['amount'] -= matched_amount
-                
-                if buy['amount'] <= 0:
-                    buy_queue.pop(0)
+            if profit > 0:
+                total_profit += profit
+                winning_trades += 1
+            else:
+                total_loss += abs(profit)
+                losing_trades += 1
+            
+            position_tracker -= trade['amount']
+            if position_tracker <= 0:
+                avg_buy_price = 0
+                position_tracker = 0
     
     profit_factor = total_profit / total_loss if total_loss > 0 else (total_profit if total_profit > 0 else 0)
     total_trades = winning_trades + losing_trades
@@ -531,11 +529,13 @@ def get_pnl_breakdown():
     conn.close()
     
     # Calculate P&L by period
+    # Match main.py logic: average_buy_price already includes buy fee
     daily_pnl = {}
     weekly_pnl = {}
     monthly_pnl = {}
     
-    buy_queue = []
+    position_tracker = 0
+    avg_buy_price = 0
     
     for trade in trades:
         timestamp = trade['timestamp']
@@ -545,37 +545,35 @@ def get_pnl_breakdown():
         month_key = date.strftime('%Y-%m')
         
         if trade['side'] == 'buy':
+            # Include maker fee in the cost basis
             price_with_fee = trade['price'] * (1 + MAKER_FEE)
-            buy_queue.append({'price': price_with_fee, 'amount': trade['amount'], 'date': day_key})
-        elif trade['side'] == 'sell' and buy_queue:
-            sell_amount = trade['amount']
-            sell_price = trade['price'] * (1 - MAKER_FEE)
+            total_cost = avg_buy_price * position_tracker + price_with_fee * trade['amount']
+            position_tracker += trade['amount']
+            avg_buy_price = total_cost / position_tracker if position_tracker > 0 else 0
+        elif trade['side'] == 'sell':
+            # avg_buy_price already includes buy fee
+            sell_revenue_after_fee = trade['price'] * (1 - MAKER_FEE)
+            profit = (sell_revenue_after_fee - avg_buy_price) * trade['amount']
             
-            while sell_amount > 0 and buy_queue:
-                buy = buy_queue[0]
-                matched_amount = min(sell_amount, buy['amount'])
-                profit = matched_amount * (sell_price - buy['price'])
-                
-                # Add to daily
-                if day_key not in daily_pnl:
-                    daily_pnl[day_key] = 0
-                daily_pnl[day_key] += profit
-                
-                # Add to weekly
-                if week_key not in weekly_pnl:
-                    weekly_pnl[week_key] = 0
-                weekly_pnl[week_key] += profit
-                
-                # Add to monthly
-                if month_key not in monthly_pnl:
-                    monthly_pnl[month_key] = 0
-                monthly_pnl[month_key] += profit
-                
-                sell_amount -= matched_amount
-                buy['amount'] -= matched_amount
-                
-                if buy['amount'] <= 0:
-                    buy_queue.pop(0)
+            # Add to daily
+            if day_key not in daily_pnl:
+                daily_pnl[day_key] = 0
+            daily_pnl[day_key] += profit
+            
+            # Add to weekly
+            if week_key not in weekly_pnl:
+                weekly_pnl[week_key] = 0
+            weekly_pnl[week_key] += profit
+            
+            # Add to monthly
+            if month_key not in monthly_pnl:
+                monthly_pnl[month_key] = 0
+            monthly_pnl[month_key] += profit
+            
+            position_tracker -= trade['amount']
+            if position_tracker <= 0:
+                avg_buy_price = 0
+                position_tracker = 0
     
     # Format response
     daily = [{'period': k, 'pnl': round(v, 4)} for k, v in sorted(daily_pnl.items())]
