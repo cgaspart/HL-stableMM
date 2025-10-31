@@ -67,13 +67,23 @@ class MarketMaker:
         can_sell_profit = False
         
         if self.position > 0 and self.average_buy_price > 0:
-            # Check if we can average down
-            buy_price_with_fee = highest_bid * (1 + MAKER_FEE)
-            can_average_down = buy_price_with_fee < self.average_buy_price
-            
-            # Check if we can sell at profit
-            breakeven_price = self.average_buy_price / (1 - MAKER_FEE)
-            can_sell_profit = lowest_ask >= breakeven_price
+            # Reset average buy price if position is very small (residual after roundtrip)
+            # This prevents the bot from trying to average down on old positions
+            if self.position < 11:
+                log(f"🔄 Resetting average buy price: position {self.position:.2f} USDHL is too small to manage")
+                log_system_event('position_reset', 'info', 
+                               f"Resetting average buy price - position {self.position:.2f} USDHL is residual", '')
+                self.average_buy_price = 0
+                can_average_down = False
+                can_sell_profit = False
+            else:
+                # Check if we can average down
+                buy_price_with_fee = highest_bid * (1 + MAKER_FEE)
+                can_average_down = buy_price_with_fee < self.average_buy_price
+                
+                # Check if we can sell at profit
+                breakeven_price = self.average_buy_price / (1 - MAKER_FEE)
+                can_sell_profit = lowest_ask >= breakeven_price
         
         # Only enforce MIN_SPREAD_BPS if we're NOT doing inventory management
         if spread_bps < MIN_SPREAD_BPS:
