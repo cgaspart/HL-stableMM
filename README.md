@@ -36,12 +36,12 @@ http://localhost:5000
 
 ## Configuration
 
-Edit `main.py` to adjust strategy parameters:
+Edit `config.py` to adjust strategy parameters:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `ORDER_SIZE` | 100 | Base order size in USDHL |
-| `MAX_POSITION` | 1000 | Maximum inventory limit |
+| `ORDER_SIZE` | 50 | Base order size in USDHL |
+| `MAX_POSITION` | 500 | Maximum inventory limit |
 | `MIN_SPREAD_BPS` | 3 | Minimum spread to trade (0.03%) |
 | `SELL_TRANCHES` | 4 | Number of sell levels |
 | `ONLY_AVERAGE_DOWN` | True | Only buy below average cost |
@@ -49,12 +49,28 @@ Edit `main.py` to adjust strategy parameters:
 ## Architecture
 
 ```
-main.py              → Market maker bot (trading logic)
-dashboard_api.py     → Flask API + web server
+config.py            → Centralized configuration and parameters
+logger.py            → Logging utilities
+database.py          → SQLite operations (trades, snapshots, events)
+exchange.py          → Hyperliquid exchange wrapper
+market_maker.py      → Core market making strategy logic
+order_manager.py     → Order placement and lifecycle management
+main.py              → Bot orchestration and main loop
+dashboard_api.py     → Flask API + web server (optional)
 market_maker.db      → SQLite database (trades, positions, metrics)
-templates/           → Dashboard HTML
-static/              → CSS/JS assets
+templates/           → Dashboard HTML (optional)
+static/              → CSS/JS assets (optional)
 ```
+
+## Module Overview
+
+- **`config.py`**: All parameters in one place (market making, order sizing, strategy thresholds)
+- **`logger.py`**: Timestamped logging utility
+- **`database.py`**: All database operations (initialization, trade tracking, snapshots, events)
+- **`exchange.py`**: `HyperliquidExchange` class wrapping CCXT operations
+- **`market_maker.py`**: `MarketMaker` class with pricing, sizing, and inventory management logic
+- **`order_manager.py`**: `OrderManager` class for order placement, cancellation, and requoting
+- **`main.py`**: `StablecoinMarketMakerBot` orchestrator that ties everything together
 
 ## API Endpoints
 
@@ -83,10 +99,10 @@ static/              → CSS/JS assets
 ```bash
 pip install -r requirements.txt
 
-# Terminal 1: Run bot
+# Run bot (includes all modular components)
 python main.py
 
-# Terminal 2: Run dashboard
+# Optional: Run dashboard in separate terminal
 python dashboard_api.py
 ```
 
@@ -97,6 +113,13 @@ python dashboard_api.py
 - **Fee Accounting**: Includes maker fees in cost basis
 - **Order Management**: Smart requoting to minimize API calls
 - **Database Persistence**: Recovers state on restart
+
+## Extending the Bot
+
+### Custom Strategies
+1. Create new strategy class in `market_maker.py`
+2. Switch strategies via config parameter
+3. Test independently before deployment
 
 ## Monitoring
 
