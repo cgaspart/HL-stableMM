@@ -151,7 +151,7 @@ class MarketMaker:
         
         if not INCREMENTAL_SELL or self.position <= 50:
             # Small position - sell all at once
-            return [(ask_price, round(self.position * 0.99, 3))]
+            return [(ask_price, round(self.position * 0.99, 3), 0, 0)]
         
         # Sell in multiple tranches at different price levels
         breakeven_price = self.average_buy_price / (1 - MAKER_FEE)
