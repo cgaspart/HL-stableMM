@@ -107,14 +107,18 @@ class OrderManager:
             # Calculate what the buy price would be WITH fees included
             buy_price_with_fee = bid_price * (1 + MAKER_FEE)
             
-            # Only buy if it would lower our average (if enabled)
-            from config import ONLY_AVERAGE_DOWN
-            if ONLY_AVERAGE_DOWN and buy_price_with_fee >= average_buy_price:
+            # Only enforce ONLY_AVERAGE_DOWN when we have significant inventory
+            # Small positions (< 10% of max) should be allowed to trade freely
+            from config import ONLY_AVERAGE_DOWN, INVENTORY_SKEW_THRESHOLD
+            inventory_ratio = position / MAX_POSITION if MAX_POSITION > 0 else 0
+            min_inventory_for_averaging = 0.1  # 10% of max position
+            
+            if ONLY_AVERAGE_DOWN and inventory_ratio >= min_inventory_for_averaging and buy_price_with_fee >= average_buy_price:
                 should_buy = False
-                log(f"⏸️ Skipping buy: price with fee {buy_price_with_fee:.5f} >= avg {average_buy_price:.5f} (would increase average)")
+                log(f"⏸️ Skipping buy: inventory {position:.2f} ({inventory_ratio*100:.1f}%), price with fee {buy_price_with_fee:.5f} >= avg {average_buy_price:.5f}")
                 log_system_event('buy_decision', 'info', 
                                f"Skipping buy: would increase average ({buy_price_with_fee:.5f} >= {average_buy_price:.5f})", '')
-            else:
+            elif buy_price_with_fee < average_buy_price:
                 # Calculate new average after this buy
                 new_total_cost = average_buy_price * position + buy_price_with_fee * buy_size
                 new_position = position + buy_size
@@ -122,6 +126,11 @@ class OrderManager:
                 log(f"✅ Averaging down: {buy_price_with_fee:.5f} < {average_buy_price:.5f}, new avg will be {new_average:.5f}")
                 log_system_event('buy_decision', 'info', 
                                f"Averaging down: {buy_price_with_fee:.5f} < {average_buy_price:.5f}, new avg: {new_average:.5f}", '')
+            else:
+                # Small inventory - allow buying even if it increases average slightly
+                log(f"✅ Small inventory ({position:.2f}, {inventory_ratio*100:.1f}%) - allowing buy at {buy_price_with_fee:.5f}")
+                log_system_event('buy_decision', 'info', 
+                               f"Small inventory ({position:.2f}) - allowing buy to build position", '')
         
         if bid_price and should_buy and position < MAX_POSITION and usdc_balance >= usdc_needed:
             # Don't place buy orders at or above 0.999
