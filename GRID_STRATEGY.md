@@ -30,11 +30,16 @@ Level 9: Buy @ 0.99795 → Sell @ 0.99895 (10 bps profit)
 ```
 
 ### Execution Flow
-1. **Initialization**: Grid centered around current mid-price
+1. **Initialization**: Grid centered around current mid-price (capped at 0.9999)
 2. **Place Orders**: All buy orders placed (optionally sell orders too)
 3. **Buy Fill**: When buy fills → immediately place paired sell order
-4. **Sell Fill**: When sell fills → calculate profit → place new buy order
+4. **Sell Fill**: When sell fills → calculate profit → place new buy order at same level
 5. **Rebalance**: If price moves >50 bps, recreate grid at new center
+
+### Important Safety Features
+- **Max Buy Price**: Never buys above 0.9999 (stablecoin peg protection)
+- **No Duplicate Buys**: Won't place new buy until sell completes
+- **Status Tracking**: Each level tracks its state (buy_placed → buy_filled → sell_placed → completed)
 
 ### Profit Calculation
 ```python
@@ -59,9 +64,10 @@ MAX_GRID_POSITION = 500       # Max total inventory
 GRID_REBALANCE_THRESHOLD_BPS = 50  # Rebalance at 50 bps move
 
 # Execution
-GRID_CHECK_INTERVAL = 2       # Check every 2 seconds
+GRID_CHECK_INTERVAL = 2       # Grid order placement
 GRID_MIN_ORDER_VALUE = 10.0   # Min $10 per order
-GRID_PLACE_BOTH_SIDES = True  # Place both buy & sell initially
+GRID_PLACE_BOTH_SIDES = True   # Place both buy & sell initially
+GRID_MAX_BUY_PRICE = 0.9999    # Never buy above this (stablecoin peg protection)
 ```
 
 ### Recommended Settings

@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Optional
 from config import (
     GRID_LEVELS, GRID_SIZE, GRID_SPACING_BPS, PROFIT_TARGET_BPS,
     MAX_GRID_POSITION, GRID_REBALANCE_THRESHOLD_BPS, GRID_MIN_ORDER_VALUE,
-    GRID_PLACE_BOTH_SIDES, MAKER_FEE
+    GRID_PLACE_BOTH_SIDES, GRID_MAX_BUY_PRICE, MAKER_FEE
 )
 from logger import log
 from database import (
@@ -54,6 +54,11 @@ class GridStrategy:
         Args:
             mid_price: Current market mid price
         """
+        # For stablecoins, cap center price to avoid buying above peg
+        if mid_price > GRID_MAX_BUY_PRICE:
+            log(f"⚠️ Mid price {mid_price:.5f} above max {GRID_MAX_BUY_PRICE:.5f}, capping center price")
+            mid_price = GRID_MAX_BUY_PRICE
+        
         self.center_price = mid_price
         self.grid_levels = []
         
@@ -67,6 +72,11 @@ class GridStrategy:
             # Calculate buy price (below center for negative i, above for positive)
             price_offset_bps = i * GRID_SPACING_BPS
             buy_price = mid_price * (1 + price_offset_bps / 10000)
+            
+            # For stablecoins, never buy above max price
+            if buy_price > GRID_MAX_BUY_PRICE:
+                log(f"   ⏸️ Skipping level {i}: buy price {buy_price:.5f} > {GRID_MAX_BUY_PRICE:.5f}")
+                continue
             
             # Calculate sell price (buy price + profit target)
             sell_price = buy_price * (1 + PROFIT_TARGET_BPS / 10000)
@@ -134,10 +144,20 @@ class GridStrategy:
             log(f"   Placing partial grid with available balance")
         
         for level in self.grid_levels:
+            # Skip if level already has active orders (buy filled waiting for sell)
+            if level.status in ['buy_filled', 'sell_placed']:
+                log(f"  ⏸️ Skipping L{level.level_index}: status={level.status}, waiting for sell to complete")
+                continue
+            
             # Check position limit
             if self.position >= MAX_GRID_POSITION:
                 log(f"⚠️ Max position reached ({self.position:.2f}/{MAX_GRID_POSITION}), skipping remaining buy orders")
                 break
+            
+            # Safety check: never buy above max price for stablecoins
+            if level.buy_price > GRID_MAX_BUY_PRICE:
+                log(f"  ⚠️ Skipping L{level.level_index}: buy price {level.buy_price:.5f} > {GRID_MAX_BUY_PRICE:.5f}")
+                continue
             
             # Place buy order
             usdc_needed = level.buy_price * level.size
@@ -282,7 +302,13 @@ class GridStrategy:
         update_grid_order_status(level.sell_order_id, is_buy=False, 
                                 filled_at=level.sell_filled_at, profit=level.profit)
         
-        # Place new buy order at the same level to continue the grid
+        # ONLY place new buy order after sell completes (not immediately after buy fills)
+        # Safety check: never buy above max price for stablecoins
+        if level.buy_price > GRID_MAX_BUY_PRICE:
+            log(f"  ⚠️ Not replacing buy L{level.level_index}: price {level.buy_price:.5f} > {GRID_MAX_BUY_PRICE:.5f}")
+            level.status = 'completed'
+            return
+        
         try:
             buy_order = exchange.create_order('buy', level.size, level.buy_price)
             level.buy_order_id = buy_order.get('id', f"buy_{level.level_index}_new")

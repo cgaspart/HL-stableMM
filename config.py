@@ -86,4 +86,5 @@ GRID_CHECK_INTERVAL = 2  # Seconds between grid checks
 
 # Grid order placement
 GRID_MIN_ORDER_VALUE = 10.0  # Minimum order value in USDC
-GRID_PLACE_BOTH_SIDES = False  # Place both buy and sell orders initially (False = only buys)
+GRID_PLACE_BOTH_SIDES = True  # Place both buy and sell orders initially (False = only buys)
+GRID_MAX_BUY_PRICE = 0.9999  # Never buy above this price (stablecoin peg protection)
