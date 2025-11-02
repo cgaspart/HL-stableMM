@@ -22,7 +22,7 @@ RUN mkdir -p /app/data
 EXPOSE 80
 
 # Make startup script executable
-RUN chmod +x /app/start.sh
+RUN chmod +x /app/start_grid.sh
 
 # Run the startup script
-CMD ["/app/start.sh"]
+CMD ["/app/start_grid.sh"]

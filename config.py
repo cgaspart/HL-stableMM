@@ -69,3 +69,21 @@ EVM_LENDING_PROTOCOL = "aave"  # Lending protocol to use
 ENABLE_DYNAMIC_ALLOCATION = False  # Enable dynamic allocation between strategies
 ALLOCATION_REBALANCE_INTERVAL = 3600  # Rebalance every hour (seconds)
 ALLOCATION_MIN_POSITION = 50  # Minimum position to consider for allocation
+
+# ============================================================================
+# GRID TRADING PARAMETERS
+# ============================================================================
+# Grid structure
+GRID_LEVELS = 10  # Number of grid levels (buy/sell pairs)
+GRID_SIZE = 50  # USDHL per grid level
+GRID_SPACING_BPS = 5  # Distance between grid levels in bps (0.05%)
+PROFIT_TARGET_BPS = 10  # Profit target per round-trip in bps (0.10%)
+
+# Grid management
+MAX_GRID_POSITION = 500  # Maximum total inventory across all grids
+GRID_REBALANCE_THRESHOLD_BPS = 50  # Recreate grid if price moves >50 bps from center (0.5%)
+GRID_CHECK_INTERVAL = 2  # Seconds between grid checks
+
+# Grid order placement
+GRID_MIN_ORDER_VALUE = 10.0  # Minimum order value in USDC
+GRID_PLACE_BOTH_SIDES = False  # Place both buy and sell orders initially (False = only buys)

@@ -85,7 +85,7 @@ class MarketMaker:
                 if can_average_down:
                     log(f"   ✅ Can average down: {highest_bid:.5f} < avg {self.average_buy_price:.5f}")
                 if can_sell_profit:
-                    log(f"   ✅ Can sell at profit: {lowest_ask:.5f} >= breakeven {can_sell_profit:.5f}")
+                    log(f"   ✅ Can sell at profit: {lowest_ask:.5f} >= breakeven {breakeven_price:.5f}")
             else:
                 log(f"⏸️ Spread too tight: {spread_bps:.2f} bps < {MIN_SPREAD_BPS} bps minimum (no inventory actions available)")
                 log_system_event('spread_check', 'info', 

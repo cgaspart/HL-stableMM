@@ -97,6 +97,40 @@ def init_database():
         )
     ''')
     
+    # Create grid orders table for tracking paired buy/sell orders
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS grid_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            grid_id TEXT NOT NULL,
+            level_index INTEGER,
+            buy_order_id TEXT,
+            sell_order_id TEXT,
+            buy_price REAL,
+            sell_price REAL,
+            size REAL,
+            status TEXT,
+            buy_filled_at INTEGER,
+            sell_filled_at INTEGER,
+            profit REAL,
+            created_at INTEGER,
+            updated_at INTEGER
+        )
+    ''')
+    
+    # Create grid state table for tracking grid configuration
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS grid_state (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            grid_id TEXT UNIQUE NOT NULL,
+            center_price REAL,
+            num_levels INTEGER,
+            grid_spacing_bps REAL,
+            profit_target_bps REAL,
+            created_at INTEGER,
+            is_active INTEGER DEFAULT 1
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -195,3 +229,121 @@ def load_trades_from_db() -> list:
     conn.close()
     
     return trades
+
+
+# ============================================================================
+# GRID TRADING DATABASE FUNCTIONS
+# ============================================================================
+
+def save_grid_state(grid_id: str, center_price: float, num_levels: int, 
+                   grid_spacing_bps: float, profit_target_bps: float) -> None:
+    """Save grid configuration state"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT OR REPLACE INTO grid_state 
+        (grid_id, center_price, num_levels, grid_spacing_bps, profit_target_bps, created_at, is_active)
+        VALUES (?, ?, ?, ?, ?, ?, 1)
+    ''', (grid_id, center_price, num_levels, grid_spacing_bps, profit_target_bps, int(time.time())))
+    
+    conn.commit()
+    conn.close()
+
+
+def deactivate_grid(grid_id: str) -> None:
+    """Mark a grid as inactive"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('UPDATE grid_state SET is_active = 0 WHERE grid_id = ?', (grid_id,))
+    
+    conn.commit()
+    conn.close()
+
+
+def save_grid_order(grid_id: str, level_index: int, buy_order_id: str, sell_order_id: str,
+                   buy_price: float, sell_price: float, size: float, status: str) -> None:
+    """Save a grid order pair"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    now = int(time.time() * 1000)
+    cursor.execute('''
+        INSERT INTO grid_orders 
+        (grid_id, level_index, buy_order_id, sell_order_id, buy_price, sell_price, 
+         size, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (grid_id, level_index, buy_order_id, sell_order_id, buy_price, sell_price, 
+          size, status, now, now))
+    
+    conn.commit()
+    conn.close()
+
+
+def update_grid_order_status(order_id: str, is_buy: bool, filled_at: int = None, 
+                            profit: float = None) -> None:
+    """Update grid order when filled"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    now = int(time.time() * 1000)
+    
+    if is_buy:
+        cursor.execute('''
+            UPDATE grid_orders 
+            SET buy_filled_at = ?, status = 'buy_filled', updated_at = ?
+            WHERE buy_order_id = ?
+        ''', (filled_at or now, now, order_id))
+    else:
+        cursor.execute('''
+            UPDATE grid_orders 
+            SET sell_filled_at = ?, profit = ?, status = 'completed', updated_at = ?
+            WHERE sell_order_id = ?
+        ''', (filled_at or now, profit, now, order_id))
+    
+    conn.commit()
+    conn.close()
+
+
+def get_active_grid_orders(grid_id: str) -> list:
+    """Get all active grid orders for a grid"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, level_index, buy_order_id, sell_order_id, buy_price, sell_price, 
+               size, status, buy_filled_at, sell_filled_at
+        FROM grid_orders 
+        WHERE grid_id = ? AND status != 'completed'
+        ORDER BY level_index
+    ''', (grid_id,))
+    
+    orders = cursor.fetchall()
+    conn.close()
+    
+    return orders
+
+
+def get_grid_performance(grid_id: str) -> dict:
+    """Get performance metrics for a grid"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT 
+            COUNT(*) as total_orders,
+            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_orders,
+            SUM(CASE WHEN profit IS NOT NULL THEN profit ELSE 0 END) as total_profit
+        FROM grid_orders 
+        WHERE grid_id = ?
+    ''', (grid_id,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    return {
+        'total_orders': result[0] if result else 0,
+        'completed_orders': result[1] if result else 0,
+        'total_profit': result[2] if result else 0
+    }
