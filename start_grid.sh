@@ -3,38 +3,23 @@
 # Grid Trading Bot Startup Script
 # Starts the grid trading bot with proper environment setup
 
+set -e
+
+# Set database path to volume
+export DB_PATH=${DB_PATH:-/app/data/market_maker.db}
+
+# Create a symbolic link to the database in the volume
+ln -sf $DB_PATH /app/market_maker.db
+
+echo "========================================="
+echo "Starting Hyperliquid Market Maker"
+echo "========================================="
+echo "Database location: $DB_PATH"
+echo "Python version: $(python --version)"
+echo "========================================="
+
 echo "🔷 Starting Grid Trading Bot..."
 
-# Check if .env file exists
-if [ ! -f .env ]; then
-    echo "❌ Error: .env file not found"
-    echo "Please create .env file with WALLET_ADDRESS and PRIVATE_KEY"
-    exit 1
-fi
 
-# Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
-
-# Check required environment variables
-if [ -z "$WALLET_ADDRESS" ] || [ -z "$PRIVATE_KEY" ]; then
-    echo "❌ Error: WALLET_ADDRESS and PRIVATE_KEY must be set in .env"
-    exit 1
-fi
-
-# Activate virtual environment if it exists
-if [ -d "venv" ]; then
-    echo "📦 Activating virtual environment..."
-    source venv/bin/activate
-fi
-
-# Check if required packages are installed
-python3 -c "import ccxt" 2>/dev/null
-if [ $? -ne 0 ]; then
-    echo "❌ Error: ccxt package not found"
-    echo "Please install: pip install -r requirements.txt"
-    exit 1
-fi
-
-# Run the grid trading bot
 echo "🚀 Launching grid trading bot..."
 python3 main_grid.py
