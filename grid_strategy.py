@@ -359,6 +359,66 @@ class GridStrategy:
         self.initialize_grid(mid_price)
         self.place_grid_orders(exchange, usdc_balance)
     
+    def check_and_place_missing_orders(self, exchange, usdc_balance: float) -> int:
+        """Check for levels without active orders and place them
+        
+        Args:
+            exchange: HyperliquidExchange instance
+            usdc_balance: Available USDC balance
+            
+        Returns:
+            int: Number of orders placed
+        """
+        orders_placed = 0
+        
+        # Get currently open orders from exchange
+        open_orders = exchange.fetch_open_orders()
+        open_order_ids = {order['id'] for order in open_orders}
+        
+        for level in self.grid_levels:
+            # Skip if level is waiting for sell to complete
+            if level.status in ['buy_filled', 'sell_placed']:
+                continue
+            
+            # Skip if buy price is too high
+            if level.buy_price > GRID_MAX_BUY_PRICE:
+                continue
+            
+            # Check if buy order exists
+            buy_order_exists = level.buy_order_id and level.buy_order_id in open_order_ids
+            sell_order_exists = level.sell_order_id and level.sell_order_id in open_order_ids
+            
+            # If no buy order and level is ready for one
+            if not buy_order_exists and level.status in ['pending', 'completed']:
+                # Check position limit
+                if self.position >= MAX_GRID_POSITION:
+                    break
+                
+                usdc_needed = level.buy_price * level.size
+                if usdc_balance >= usdc_needed:
+                    try:
+                        buy_order = exchange.create_order('buy', level.size, level.buy_price)
+                        level.buy_order_id = buy_order.get('id', f"buy_{level.level_index}")
+                        level.status = 'buy_placed'
+                        usdc_balance -= usdc_needed
+                        orders_placed += 1
+                        log(f"  ✅ Placed missing buy L{level.level_index}: {level.size} @ {level.buy_price:.5f}")
+                    except Exception as e:
+                        log(f"  ❌ Error placing buy L{level.level_index}: {e}")
+            
+            # If buy filled but no sell order
+            elif level.status == 'buy_filled' and not sell_order_exists:
+                try:
+                    sell_order = exchange.create_order('sell', level.size, level.sell_price)
+                    level.sell_order_id = sell_order.get('id', f"sell_{level.level_index}")
+                    level.status = 'sell_placed'
+                    orders_placed += 1
+                    log(f"  ✅ Placed missing sell L{level.level_index}: {level.size} @ {level.sell_price:.5f}")
+                except Exception as e:
+                    log(f"  ❌ Error placing sell L{level.level_index}: {e}")
+        
+        return orders_placed
+    
     def get_grid_status(self) -> dict:
         """Get current grid status
         

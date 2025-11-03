@@ -79,10 +79,17 @@ class GridTradingBot:
         elif self.grid.should_rebalance_grid(mid_price):
             self.grid.rebalance_grid(self.exchange, mid_price, usdc_balance)
         else:
+            # Check if any levels need orders placed
+            orders_needed = self.grid.check_and_place_missing_orders(self.exchange, usdc_balance)
+            
             # Show grid status
             status = self.grid.get_grid_status()
-            log(f"📊 Grid Status: {status['buy_filled']}/{status['total_levels']} filled, "
-                f"{status['completed']} completed, ${status['total_profit']:.2f} profit")
+            if orders_needed > 0:
+                log(f"📊 Grid Status: {status['buy_filled']}/{status['total_levels']} filled, "
+                    f"{status['completed']} completed, ${status['total_profit']:.2f} profit, {orders_needed} orders placed")
+            else:
+                log(f"📊 Grid Status: {status['buy_filled']}/{status['total_levels']} filled, "
+                    f"{status['completed']} completed, ${status['total_profit']:.2f} profit")
     
     def run(self) -> None:
         """Main bot loop"""
